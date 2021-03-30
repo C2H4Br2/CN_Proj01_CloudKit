@@ -32,7 +32,10 @@ PORT = 5050
 SERVER = socket.gethostbyname(socket.gethostname()) # automatically get IP Address
 ADDR = (SERVER, PORT) # address
 FORMAT = 'utf-8' # encoding & decoding format
+
+# Messages
 DISCON_MSG = "!DISCONNECT" # disconnect message
+WLCM_MSG = "!WELCOME" # welcome message
 
 # == SUPPORTING METHODS ======================================================================
 
@@ -138,25 +141,28 @@ def sv_find_client():
 def sv_handle_client(conn, addr): # client's connection and address
     global cl_list # enable edit for these variables
     
-    tm_print(f"{addr} Connected.")
-    
-    connected = True
     cl_name = sv_cl_list_add(conn) # add client to list
     idx = sv_get_client(cl_list, cl_name) # get client's name via its index
-    while (connected): # wait to receive messages from the client
+    cl_name_show = f"[{cl_list[idx]}]"
+    conn.send(WLCM_MSG.encode(FORMAT)) # send a welcome message to the client
+
+    tm_print(f"{cl_name_show} Connected.")
+    
+    while (True): # wait to receive messages from the client
         msg_len = conn.recv(HEADER).decode(FORMAT) # get the length of the message
         if (msg_len): # check if message is not null
             msg_len = int(msg_len) # convert it to integer
             msg = conn.recv(msg_len).decode(FORMAT) # get the message
             if (msg == DISCON_MSG):
-                connected = False
+                break
             
-            tm_print(f"[{cl_list[idx]}] {msg}")
+            tm_print(f"{cl_name_show} {msg}")
     
     # remove the client from list
     del cl_list[idx] # remove client from list
 
     # close the connection
+    tm_print(f"{cl_name_show} Disconnected.")
     conn.close()
 
 # add new client to list

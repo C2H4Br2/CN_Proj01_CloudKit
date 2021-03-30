@@ -37,7 +37,10 @@ PORT = 5050
 SERVER = "10.10.191.108"
 ADDR = (SERVER, PORT) # host's address
 FORMAT = 'utf-8' # encoding & decoding format
+
+# Messages
 DISCON_MSG = "!DISCONNECT" # disconnect message
+WLCM_MSG = "!WELCOME" # welcome message
 
 # == GUI: MAIN WINDOW & CLIENT ===============================================================
 
@@ -98,7 +101,9 @@ class Ck(Tk):
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.connect(ADDR)
 
-            self.cl_send(username)
+            self.cl_send(username) # send username to the server
+            show_noti = threading.Thread(target = mbox.showinfo, args = ("NOTIFICATION!", f"Welcome to the server, {username}!"))
+            show_noti.start()
             self.cl_main()
         
         except:
