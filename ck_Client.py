@@ -29,18 +29,21 @@ FNT_MAIN = ("Quicksand Bold", 12)
 SRC = "Resources/" # 'Resources' directory
 
 # Client & Server
-username = "" # client's username
-client = None # client
-conn_status = False # connection status
 HEADER = 64 # store length of messages
 PORT = 5050
-SERVER = "10.10.191.108"
-ADDR = (SERVER, PORT) # host's address
 FORMAT = 'utf-8' # encoding & decoding format
 
 # Messages
 DISCON_MSG = "!DISCONNECT" # disconnect message
 WLCM_MSG = "!WELCOME" # welcome message
+
+# == VARIABLES ===============================================================================
+
+# Client & Server
+client = None # client
+conn_status = False # connection status
+server = "" # server ip
+addr = () # server address
 
 # == GUI: MAIN WINDOW & CLIENT ===============================================================
 
@@ -95,11 +98,11 @@ class Ck(Tk):
 
         # connect to the server
     def cl_connect(self, username):
-        global client, conn_status # enable edit for these variables
+        global client, conn_status, addr # enable edit for these variables
         # create a socket for the client using (type: IPv4, mode: TCP)
         try:
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            client.connect(ADDR)
+            client.connect(addr)
 
             self.cl_send(username) # send username to the server
             show_noti = threading.Thread(target = mbox.showinfo, args = ("NOTIFICATION!", f"Welcome to the server, {username}!"))
@@ -134,8 +137,9 @@ class ck_login(Frame):
         
         # images
         self.img_logo = PhotoImage(file = SRC + "spr_logo.png") # logo
-        self.img_username = PhotoImage(file = SRC + "spr_username.png") # username icon
-        self.img_password = PhotoImage(file = SRC + "spr_password.png") # password icon
+        self.img_username = PhotoImage(file = SRC + "spr_icon_username.png") # username icon
+        self.img_password = PhotoImage(file = SRC + "spr_icon_password.png") # password icon
+        self.img_ip = PhotoImage(file = SRC + "spr_icon_ip.png") # server ip icon
         self.img_entry = PhotoImage(file = SRC + "spr_entry.png") # entry
         self.img_btn_login = PhotoImage(file = SRC + "spr_btn_login.png") # login button
         self.img_btn_register = PhotoImage(file = SRC + "spr_btn_register.png") # register button
@@ -146,14 +150,18 @@ class ck_login(Frame):
             # Dummy input fields
         self.lb_en_user = Label(self, image = self.img_entry, bg = COL_BG) # username dummy input field
         self.lb_en_pass = Label(self, image = self.img_entry, bg = COL_BG) # password dummy input field
+        self.lb_en_ip = Label(self, image = self.img_entry, bg = COL_BG) # server ip dummy input    
             # Icons
         self.lb_username = Label(self, image = self.img_username, bg = COL_BG) # username icon
         self.lb_password = Label(self, image = self.img_password, bg = COL_BG) # password icon
+        self.lb_ip = Label(self, image = self.img_ip, bg = COL_BG) # server ip icon
             # Input fields
         self.en_username = Entry(self, bd = 1, font = FNT_MAIN, width = 23, 
             selectbackground = COL_GRAY, relief = FLAT) # username input field
         self.en_password = Entry(self, bd = 1, font = FNT_MAIN, width = 23, 
             selectbackground = COL_GRAY, relief = FLAT, show = "•") # username input field
+        self.en_ip = Entry(self, bd = 1, font = FNT_MAIN, width = 23,
+            selectbackground = COL_GRAY, relief = FLAT) # server ip input field
             # Buttons
         self.btn_login = Button(self, image = self.img_btn_login, borderwidth = 0, bg = COL_BG, 
             activebackground = COL_BG, command = lambda : self.rm_login_check(0)) # login button
@@ -163,34 +171,41 @@ class ck_login(Frame):
         # widgets positioning
             # logo
         self.lb_logo.place(x = CEN_X, y = CEN_Y - 128, anchor = "center")
-                # username & password
-        user_offy = 8; pass_offy = user_offy + 52 # vertical offset for username and password
-        lb_en_offx = 116; lb_offx = 160; en_offx = 96 # horizontal offset for username and password
-        btn_offy = pass_offy + 32 # vertical offset for buttons
-                # username
+            # username & password
+        user_offy = 8; pass_offy = user_offy + 52; ip_offy = pass_offy + 52 # vertical offset for username and password
+        lb_en_offx = 116; lb_offx = 160; en_offx = 96 # horizontal offset for input fields
+        btn_offy = ip_offy + 32 # vertical offset for buttons
+            # username
         self.lb_en_user.place(x = CEN_X - lb_en_offx, y = CEN_Y + user_offy, anchor = "w")
         self.lb_username.place(x = CEN_X - lb_offx, y = CEN_Y + user_offy, anchor = "w")
         self.en_username.place(x = CEN_X - en_offx, y = CEN_Y + user_offy, anchor = "w")
-                # password
+            # password
         self.lb_en_pass.place(x = CEN_X - lb_en_offx, y = CEN_Y + pass_offy, anchor = "w")
         self.lb_password.place(x = CEN_X - lb_offx, y = CEN_Y + pass_offy, anchor = "w")
         self.en_password.place(x = CEN_X - en_offx, y = CEN_Y + pass_offy, anchor = "w")
-                # buttons
+            # server ip
+        self.lb_en_ip.place(x = CEN_X - lb_en_offx, y = CEN_Y + ip_offy, anchor = "w")
+        self.lb_ip.place(x = CEN_X - lb_offx, y = CEN_Y + ip_offy, anchor = "w")
+        self.en_ip.place(x = CEN_X - en_offx, y = CEN_Y + ip_offy, anchor = "w")
+            # buttons
         self.btn_login.place(x = CEN_X - 6, y = CEN_Y + btn_offy, anchor = "ne")
         self.btn_register.place(x = CEN_X + 6, y = CEN_Y + btn_offy, anchor = "nw")
 
     # check if login is valid
     def rm_login_check(self, type):
-        global username, conn_status
-        # Get username & password in the input fields
+        global username, conn_status, server, addr
+        # Get username, password & server ip in the input fields
         t_user = self.en_username.get()
         t_pass = self.en_password.get()
+        t_ip = self.en_ip.get()
 
         # Check if input is valid
-        if (t_user == "" or t_pass == ""):
+        if (t_user == "" or t_pass == "" or t_ip == ""):
             mbox.showinfo("Warning!", "Blank input is not allowed.")
         else:
             username = t_user # set username
+            server = t_ip # set server ip
+            addr = (t_ip, PORT) # set server address
             conn_status = True
 
 # == MAIN PROGRAM ============================================================================
