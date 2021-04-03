@@ -8,6 +8,10 @@ from tkinter import messagebox as mbox # message box
 import tkinter.font as TkFont # font
 import datetime # get time for each log in terminal
 
+# SQL
+import sqlite3 as sql
+import os.path # check for database's existence
+
 # Socket
 import socket
 import threading # prevent socket methods from freezing the GUI
@@ -33,15 +37,85 @@ SERVER = socket.gethostbyname(socket.gethostname()) # automatically get IP Addre
 ADDR = (SERVER, PORT) # address
 FORMAT = 'utf-8' # encoding & decoding format
 
+# Database
+DB = "ck_database.db"
+
 # Messages
 DISCON_MSG = "!DISCONNECT" # disconnect message
-WLCM_MSG = "!WELCOME" # welcome message
+MSG_LG_TRUE = "!LG_TRUE" # login successful
+MSG_LG_FALSE = "!LG_FALSE" # login failed
 
 # == SUPPORTING METHODS ======================================================================
 
 # Get current date & time
 def curtime(): # current time
     return datetime.datetime.now().strftime(f"[%d/%m/20%y %H:%M:%S]") #strftime: string from time
+
+# == DATABASE INITIALIZATION==================================================================
+
+SQLITE_THREADSAFE = 2
+
+# check if the database is already created
+db_exist = os.path.isfile(DB)
+
+# connect to the database (or create a new one if none exists)
+db_conn = sql.connect(DB)
+
+# create a cursor which is used to execute SQL commands
+cur = db_conn.cursor()
+
+# create tables
+if (db_exist == False):
+    # users & admins
+    cur.execute("""CREATE TABLE tb_user (
+        username TEXT,
+        password TEXT,
+        usertype INTEGER
+    )""")
+
+    # city
+    cur.execute("""CREATE TABLE tb_city(
+        id TEXT,
+        name TEXT
+    )""")
+
+    # temperature (celcius, according to date)
+    cur.execute("""CREATE TABLE tb_temp(
+        id TEXT,
+        temp INTEGER,
+        status TEXT,
+        date TEXT
+    )""")
+
+# insert data
+    # default users
+df_users =  [
+                ('19127311', 'ohmygod', 1),
+                ('gulugulu', 'hoimo', 0)
+            ]
+    # default cities
+df_cities = [
+                ('SGN', 'TP HCM'),
+                ('HAN', 'Hà Nội'),
+                ('DLT', 'Đà Lạt')
+            ]
+    # default temperatures
+df_temp =   [
+                ('SGN', 35, 'Sunny', '2021-04-01'),
+                ('SGN', 31, 'Cloudy', '2021-04-02'),
+                ('HAN', 25, 'Sunny', '2021-04-01'),
+                ('HAN', 21, 'Rainy', '2021-04-02'),
+                ('DLT', 17, 'Windy', '2021-04-01')
+            ]
+    # insert the default data if database is not created before
+if (db_exist == False):
+    cur.executemany("INSERT INTO tb_user VALUES (?, ?, ?)", df_users)
+    cur.executemany("INSERT INTO tb_city VALUES (?, ?)", df_cities)
+    cur.executemany("INSERT INTO tb_temp VALUES (?, ?, ?, ?)", df_temp)
+
+# commit all commands
+if (db_exist == False):
+    db_conn.commit()
 
 # == SETUP: GUI ==============================================================================
 
@@ -134,21 +208,51 @@ def sv_find_client():
         # stop and listen & accept the client
         conn, addr = server.accept() # (connection, address)
         # create new thread for handling that client
-        thread = threading.Thread(target = sv_handle_client, args = (conn, addr))
-        thread.start()
+        thread_0 = threading.Thread(target = sv_handle_login, args = (conn, addr), daemon = True)
+        thread_0.start()
+
+# handle client's login
+def sv_handle_login(conn, addr): # client's connection and address
+    with sql.connect(DB) as con:
+        # check if client's username exists
+        cl_lgtype = sv_get_msg(conn) # let the server know if the user's logging in or registering
+        cl_name = sv_get_msg(conn) # get username
+        cl_pass = sv_get_msg(conn) # get password
+        cl_usertype = sv_get_msg(conn) # get usertype (admin/client)
+        
+        t_cur = con.cursor() # create new db cursor for the thread
+        if (cl_lgtype):
+            # check if the username already exists
+                # get the number of cl_name
+            t_cur.execute(f"""SELECT COUNT(*) 
+                            FROM (SELECT username 
+                                    FROM tb_user 
+                                    WHERE username = '{cl_name}')""")
+            cur_count_arr = t_cur.fetchone() # get the result string
+            cur_count = cur_count_arr[0] # get the count from the string
+            
+            # if it doesn't exist
+            if (cur_count == 0):
+                t_cur.execute(f"INSERT INTO tb_user VALUES ('{cl_name}','{cl_pass}','{cl_usertype}')")
+                sv_send_msg(MSG_LG_TRUE, conn)
+                sv_handle_client(conn, addr, cl_name)
+                return
+            # if it does
+            else:
+                sv_send_msg(MSG_LG_FALSE, conn)
+                sv_handle_login(conn, addr)
 
 # handle a single client
-def sv_handle_client(conn, addr): # client's connection and address
+def sv_handle_client(conn, addr, cl_name): # client's connection and address
     global cl_list # enable edit for these variables
-    
-    cl_name = sv_cl_list_add(conn) # add client to list
+
+    cl_list.append(cl_name) # add client to list
     idx = sv_get_client(cl_list, cl_name) # get client's name via its index
     cl_name_show = f"[{cl_list[idx]}]"
-    conn.send(WLCM_MSG.encode(FORMAT)) # send a welcome message to the client
 
     tm_print(f"{cl_name_show} Connected.")
     
-    while (True): # wait to receive messages from the client
+    while (True): # wait for messages from the client
         msg_len = conn.recv(HEADER).decode(FORMAT) # get the length of the message
         if (msg_len): # check if message is not null
             msg_len = int(msg_len) # convert it to integer
@@ -165,14 +269,20 @@ def sv_handle_client(conn, addr): # client's connection and address
     tm_print(f"{cl_name_show} Disconnected.")
     conn.close()
 
-# add new client to list
-def sv_cl_list_add(conn):
-    global cl_list # enable edit for these variables
-    name_len = conn.recv(HEADER).decode(FORMAT) # get the length of the name
-    name_len = int(name_len) # convert it to integer
-    name = conn.recv(name_len).decode(FORMAT) # get name
-    cl_list.append(name) # add new client to list
-    return name
+def sv_send_msg(a_msg, conn):
+    msg = a_msg.encode(FORMAT) # encode the message
+    msg_len = len(msg) # get length of the message
+    send_len = str(msg_len).encode(FORMAT) # encode the length
+    send_len += b' ' * (HEADER - len(send_len)) # add blank spaces to the send_len to match HEADER (64)
+    conn.send(send_len) # send the length
+    conn.send(msg) # send the message
+
+# get message
+def sv_get_msg(conn):
+    msg_len = conn.recv(HEADER).decode(FORMAT) # get the length of the message
+    msg_len = int(msg_len) # convert it to integer
+    msg = conn.recv(msg_len).decode(FORMAT) # get message
+    return msg
 
 # get client's index
 def sv_get_client(cl_list, cl_name): # client list, client name
@@ -200,7 +310,9 @@ def sv_stop():
     except:
         tm_print("Mission failed. We'll close the server next time.")
 
-
 # == MAIN PROGRAM ============================================================================
 
 ck.mainloop()
+
+# close the connection to database
+db_conn.close()

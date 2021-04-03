@@ -35,15 +35,25 @@ FORMAT = 'utf-8' # encoding & decoding format
 
 # Messages
 DISCON_MSG = "!DISCONNECT" # disconnect message
-WLCM_MSG = "!WELCOME" # welcome message
+MSG_LG_TRUE = "!LG_TRUE" # login successful
+MSG_LG_FALSE = "!LG_FALSE" # login failed
 
 # == VARIABLES ===============================================================================
 
 # Client & Server
 client = None # client
 conn_status = False # connection status
+login_type = 0 # 0 = login; 1 = register
 server = "" # server ip
 addr = () # server address
+username = ""; password = ""
+
+# == SUPPORTING METHODS ======================================================================
+
+# Start new thread for message box
+def thread_mbox(title, body):
+    thr_mbox = threading.Thread(target = mbox.showinfo, args = (title, body))
+    thr_mbox.start()
 
 # == GUI: MAIN WINDOW & CLIENT ===============================================================
 
@@ -78,8 +88,8 @@ class Ck(Tk):
             frame.grid(row = 0, column = 0, sticky = "nsew")
 
         self.show_frame("ck_login")
-        thread = threading.Thread(target = self.cl_check_conn)
-        thread.start()
+        check_conn = threading.Thread(target = self.cl_check_conn, daemon = True) # daemon: kill the thread when the program exits
+        check_conn.start()
 
     # change frame
     def show_frame(self, page_name):
@@ -88,32 +98,41 @@ class Ck(Tk):
 
     # client methods
     
-        # check for connection status (logged in or not)
+    #   check for connection status (logged in or not)
     def cl_check_conn(self):
         global client, conn_status # enable edit for these varibles
         while (True):
             if (conn_status):
                 self.cl_connect(username)
-                break    
 
-        # connect to the server
+    #   connect to the server
     def cl_connect(self, username):
-        global client, conn_status, addr # enable edit for these variables
+        global client, conn_status, addr, login_type # enable edit for these variables
         # create a socket for the client using (type: IPv4, mode: TCP)
         try:
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.connect(addr)
 
+            self.cl_send(str(login_type)) # let server know if the user is logging in or registering
             self.cl_send(username) # send username to the server
-            show_noti = threading.Thread(target = mbox.showinfo, args = ("NOTIFICATION!", f"Welcome to the server, {username}!"))
-            show_noti.start()
-            self.cl_main()
-        
+            self.cl_send(password) # send password to the server
+            self.cl_send('0') # send usertype (admin/client) to the server
+            
+            lg_ok = (self.cl_get() == MSG_LG_TRUE) # check if login/register is successful
+            if (lg_ok):
+                thread_mbox("NOTIFICATION!", f"Welcome to the server, {username}!")
+                self.cl_main()
+            else:
+                if (login_type == 1):
+                    thread_mbox("WARNING!", "Unsuccessful registry.\nUsername already exists.")           
         except:
-            mbox.showinfo("WARNING!", "Mission failed. We'll connect next time.")
-            conn_status = False
+            thread_mbox("WARNING!", "Mission failed. We'll connect next time.")
+        
+        client.close()
+        conn_status = False
+        
 
-        # send messages
+    #   send messages
     def cl_send(self, a_msg):
         msg = a_msg.encode(FORMAT) # encode the message
         msg_len = len(msg) # get length of the message
@@ -122,7 +141,14 @@ class Ck(Tk):
         client.send(send_len) # send the length
         client.send(msg) # send the message
     
-        # main method
+    #   receive messages
+    def cl_get(self):
+        msg_len = client.recv(HEADER).decode(FORMAT) # get the length of the message
+        msg_len = int(msg_len) # convert it to integer
+        msg = client.recv(msg_len).decode(FORMAT) # get message
+        return msg
+
+    #    main method
     def cl_main(self):
         self.cl_send("Chào bồ tui nìa ó nhooo!!! >w<")
         self.cl_send("Iu bồ tui lém óoo!!! >w<")
@@ -192,8 +218,8 @@ class ck_login(Frame):
         self.btn_register.place(x = CEN_X + 6, y = CEN_Y + btn_offy, anchor = "nw")
 
     # check if login is valid
-    def rm_login_check(self, type):
-        global username, conn_status, server, addr
+    def rm_login_check(self, lg_type):
+        global username, password, conn_status, server, addr, login_type
         # Get username, password & server ip in the input fields
         t_user = self.en_username.get()
         t_pass = self.en_password.get()
@@ -204,9 +230,11 @@ class ck_login(Frame):
             mbox.showinfo("Warning!", "Blank input is not allowed.")
         else:
             username = t_user # set username
+            password = t_pass # set password
             server = t_ip # set server ip
             addr = (t_ip, PORT) # set server address
-            conn_status = True
+            conn_status = True # allow connection to server
+            login_type = lg_type # let the server know if the user is logging in or registering
 
 # == MAIN PROGRAM ============================================================================
 
