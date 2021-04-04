@@ -215,32 +215,42 @@ def sv_find_client():
 def sv_handle_login(conn, addr): # client's connection and address
     with sql.connect(DB) as con:
         # check if client's username exists
-        cl_lgtype = sv_get_msg(conn) # let the server know if the user's logging in or registering
+        cl_lgtype = int(sv_get_msg(conn)) # let the server know if the user's logging in or registering
         cl_name = sv_get_msg(conn) # get username
         cl_pass = sv_get_msg(conn) # get password
-        cl_usertype = sv_get_msg(conn) # get usertype (admin/client)
-        
+        cl_usertype = int(sv_get_msg(conn)) # get usertype (admin/client)
+
         t_cur = con.cursor() # create new db cursor for the thread
-        if (cl_lgtype):
-            # check if the username already exists
-                # get the number of cl_name
-            t_cur.execute(f"""SELECT COUNT(*) 
-                            FROM (SELECT username 
-                                    FROM tb_user 
-                                    WHERE username = '{cl_name}')""")
-            cur_count_arr = t_cur.fetchone() # get the result string
-            cur_count = cur_count_arr[0] # get the count from the string
-            
-            # if it doesn't exist
-            if (cur_count == 0):
+
+        # check if the username already exists
+            # get the number of cl_name
+        t_cur.execute(f"""SELECT COUNT(*) 
+                        FROM (SELECT username 
+                                FROM tb_user 
+                                WHERE username = '{cl_name}')""")
+        cur_count_arr = t_cur.fetchone() # get the result string
+        cur_count = cur_count_arr[0] # get the count from the string
+        name_exist = (cur_count > 0)
+        
+        if (cl_lgtype == 1): # 1: register
+            if (not name_exist): # if username exists
                 t_cur.execute(f"INSERT INTO tb_user VALUES ('{cl_name}','{cl_pass}','{cl_usertype}')")
                 sv_send_msg(MSG_LG_TRUE, conn)
                 sv_handle_client(conn, addr, cl_name)
                 return
-            # if it does
-            else:
-                sv_send_msg(MSG_LG_FALSE, conn)
-                sv_handle_login(conn, addr)
+        else: # 0: login
+            if (name_exist): # if username exists
+                # check if password matches
+                t_cur.execute(f"SELECT password FROM tb_user WHERE username = '{cl_name}'")
+                cur_pass = t_cur.fetchone()[0]
+                
+                if (cl_usertype == 1 and cur_pass == cl_pass): # check if the user is client
+                    sv_send_msg(MSG_LG_TRUE, conn)
+                    sv_handle_client(conn, addr, cl_name)
+                    return
+        # if all of the above fail
+        sv_send_msg(MSG_LG_FALSE, conn)
+        sv_handle_login(conn, addr)
 
 # handle a single client
 def sv_handle_client(conn, addr, cl_name): # client's connection and address

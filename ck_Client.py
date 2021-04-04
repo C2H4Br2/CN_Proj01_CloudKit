@@ -52,7 +52,7 @@ username = ""; password = ""
 
 # Start new thread for message box
 def thread_mbox(title, body):
-    thr_mbox = threading.Thread(target = mbox.showinfo, args = (title, body))
+    thr_mbox = threading.Thread(target = mbox.showinfo, args = (title, body), daemon = True)
     thr_mbox.start()
 
 # == GUI: MAIN WINDOW & CLIENT ===============================================================
@@ -113,10 +113,10 @@ class Ck(Tk):
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.connect(addr)
 
-            self.cl_send(str(login_type)) # let server know if the user is logging in or registering
+            self.cl_send(f'{login_type}') # let server know if the user is logging in or registering
             self.cl_send(username) # send username to the server
             self.cl_send(password) # send password to the server
-            self.cl_send('0') # send usertype (admin/client) to the server
+            self.cl_send('1') # send usertype (admin/client) to the server
             
             lg_ok = (self.cl_get() == MSG_LG_TRUE) # check if login/register is successful
             if (lg_ok):
@@ -125,13 +125,14 @@ class Ck(Tk):
             else:
                 if (login_type == 1):
                     thread_mbox("WARNING!", "Unsuccessful registry.\nUsername already exists.")           
+                else:
+                    thread_mbox("WARNING!", "Unsuccessful login.\nUsername doesn't exist.")
+                #client.close()
         except:
             thread_mbox("WARNING!", "Mission failed. We'll connect next time.")
         
-        client.close()
         conn_status = False
         
-
     #   send messages
     def cl_send(self, a_msg):
         msg = a_msg.encode(FORMAT) # encode the message
