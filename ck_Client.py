@@ -7,6 +7,7 @@ from tkinter import * # GUI
 from tkinter import messagebox as mbox # message box
 import tkinter.font as TkFont # font
 import datetime # get time for each log in terminal
+from tkvideo import tkvideo
 
 # socket
 import socket
@@ -26,7 +27,7 @@ CEN_X = GLOBAL_W / 2; CEN_Y = GLOBAL_H / 2
 FNT_MAIN = ("Quicksand Bold", 12)
 
 # Others
-SRC = "Resources/" # 'Resources' directory
+SRC = "Resources/Client/" # 'Resources' directory
 
 # Client & Server
 HEADER = 64 # store length of messages
@@ -48,12 +49,16 @@ server = "" # server ip
 addr = () # server address
 username = ""; password = ""
 
+# video
+start_video = False
+
 # == SUPPORTING METHODS ======================================================================
 
 # Start new thread for message box
 def thread_mbox(title, body):
-    thr_mbox = threading.Thread(target = mbox.showinfo, args = (title, body), daemon = True)
-    thr_mbox.start()
+    #thr_mbox = threading.Thread(target = mbox.showinfo, args = (title, body), daemon = True)
+    #thr_mbox.start()
+    mbox.showinfo(title, body)
 
 # == GUI: MAIN WINDOW & CLIENT ===============================================================
 
@@ -79,7 +84,7 @@ class Ck(Tk):
         self.frames = {}
         
         # create the pages
-        for F in ([ck_login]):
+        for F in ([ck_login, ck_main]):
             page_name = F.__name__
             frame = F(parent = container, controller = self)
             frame.configure(bg = COL_BG)
@@ -107,7 +112,7 @@ class Ck(Tk):
 
     #   connect to the server
     def cl_connect(self, username):
-        global client, conn_status, addr, login_type # enable edit for these variables
+        global client, conn_status, addr, login_type, vid_start # enable edit for these variables
         # create a socket for the client using (type: IPv4, mode: TCP)
         try:
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -120,13 +125,13 @@ class Ck(Tk):
             
             lg_ok = (self.cl_get() == MSG_LG_TRUE) # check if login/register is successful
             if (lg_ok):
-                thread_mbox("NOTIFICATION!", f"Welcome to the server, {username}!")
+                self.show_frame("ck_main")
                 self.cl_main()
             else:
                 if (login_type == 1):
-                    thread_mbox("WARNING!", "Unsuccessful registry.\nUsername already exists.")           
+                    thread_mbox("WARNING!", "Registry unsuccessful.")  
                 else:
-                    thread_mbox("WARNING!", "Unsuccessful login.\nUsername doesn't exist.")
+                    thread_mbox("WARNING!", "Login unsuccessful.")
                 #client.close()
         except:
             thread_mbox("WARNING!", "Mission failed. We'll connect next time.")
@@ -220,7 +225,7 @@ class ck_login(Frame):
 
     # check if login is valid
     def rm_login_check(self, lg_type):
-        global username, password, conn_status, server, addr, login_type
+        global username, password, conn_status, server, addr, login_type, start_video
         # Get username, password & server ip in the input fields
         t_user = self.en_username.get()
         t_pass = self.en_password.get()
@@ -236,6 +241,39 @@ class ck_login(Frame):
             addr = (t_ip, PORT) # set server address
             conn_status = True # allow connection to server
             login_type = lg_type # let the server know if the user is logging in or registering
+            start_video = True # allow welcome video to play
+
+# == GUI: MAIN WINDOW ========================================================================
+
+class ck_main(Frame):
+    # constructor method
+    def __init__(self, parent, controller):
+        Frame.__init__(self, parent)
+        
+        # background & images  
+        self.bg_main = PhotoImage(file = SRC + "bg_main.png") # load background
+        self.img_btn_list = PhotoImage(file = SRC + "spr_btn_list.png") # list button
+
+        # widgets
+            # background
+        self.lb_bg_main = Label(self, image = self.bg_main, bg = COL_BG) # background
+            # input fields
+        self.en_city = Entry(self, bd = 1, font = FNT_MAIN, width = 10, 
+            selectbackground = COL_GRAY, relief = FLAT) # city id input field
+        self.en_date = Entry(self, bd = 1, font = FNT_MAIN, width = 10,
+            selectbackground = COL_GRAY, relief = FLAT) # date input field
+            # buttons
+        self.btn_list = Button(self, image = self.img_btn_list, borderwidth = 0, bg = COL_BG,
+            activebackground = COL_BG) # list button
+        
+        # widgets positioning
+            # background
+        self.lb_bg_main.place(x = 0, y = 0, anchor = "nw")
+            # input fields
+        self.en_city.place(x = 390, y = 80, anchor = "nw")
+        self.en_date.place(x = 536, y = 80, anchor = "nw")
+            # buttons
+        self.btn_list.place(x = 664, y = 74, anchor = "nw")
 
 # == MAIN PROGRAM ============================================================================
 

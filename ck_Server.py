@@ -28,7 +28,7 @@ GLOBAL_W = 800; GLOBAL_H = 600
 CEN_X = GLOBAL_W / 2; CEN_Y = GLOBAL_H / 2
 
 # Others
-SRC = "Resources/" # 'Resources' directory
+SRC = "Resources/Server/" # 'Resources' directory
 
 # Server
 HEADER = 64 # store length of messages
@@ -231,7 +231,7 @@ def sv_handle_login(conn, addr): # client's connection and address
         cur_count_arr = t_cur.fetchone() # get the result string
         cur_count = cur_count_arr[0] # get the count from the string
         name_exist = (cur_count > 0)
-        
+
         if (cl_lgtype == 1): # 1: register
             if (not name_exist): # if username exists
                 t_cur.execute(f"INSERT INTO tb_user VALUES ('{cl_name}','{cl_pass}','{cl_usertype}')")
@@ -240,11 +240,13 @@ def sv_handle_login(conn, addr): # client's connection and address
                 return
         else: # 0: login
             if (name_exist): # if username exists
-                # check if password matches
-                t_cur.execute(f"SELECT password FROM tb_user WHERE username = '{cl_name}'")
-                cur_pass = t_cur.fetchone()[0]
+                # check if password and usertype matches
+                t_cur.execute(f"SELECT password, usertype FROM tb_user WHERE username = '{cl_name}'")
+                cur_result = t_cur.fetchone() # get query
+                cur_pass = cur_result[0] # get password
+                cur_type = cur_result[1] # get usertype
                 
-                if (cl_usertype == 1 and cur_pass == cl_pass): # check if the user is client
+                if (cur_type == cl_usertype and cur_pass == cl_pass): # check if the user is client
                     sv_send_msg(MSG_LG_TRUE, conn)
                     sv_handle_client(conn, addr, cl_name)
                     return
