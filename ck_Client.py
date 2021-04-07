@@ -8,6 +8,7 @@ from tkinter import messagebox as mbox # message box
 import tkinter.font as TkFont # font
 import datetime # get time for each log in terminal
 from tkvideo import tkvideo
+import time # for video pause
 
 # socket
 import socket
@@ -67,9 +68,10 @@ class Ck(Tk):
     def __init__(self, *args, **kwargs):
         # constructor method for Tk
         Tk.__init__(self, *args, **kwargs)
+
         self.title('Cloud Kit Weather Forecast') # set title
         self.iconbitmap('Resources/ico_logo.ico') # set icon
-        self.geometry(str(GLOBAL_W) + "x" + str(GLOBAL_H)) # set original size
+        self.geometry(f"{str(GLOBAL_W)}x{str(GLOBAL_H)}+280+120") # set original size
         self.configure(bg = COL_BG) # background color
         self.resizable(0, 0) # allow no resizing
 
@@ -95,7 +97,7 @@ class Ck(Tk):
         self.show_frame("ck_login")
         check_conn = threading.Thread(target = self.cl_check_conn, daemon = True) # daemon: kill the thread when the program exits
         check_conn.start()
-
+        
     # change frame
     def show_frame(self, page_name):
         frame = self.frames[page_name]
@@ -253,6 +255,7 @@ class ck_main(Frame):
         # background & images  
         self.bg_main = PhotoImage(file = SRC + "bg_main.png") # load background
         self.img_btn_list = PhotoImage(file = SRC + "spr_btn_list.png") # list button
+        self.img_btn_logout = PhotoImage(file = SRC + "spr_btn_logout.png") # logout button
 
         # widgets
             # background
@@ -265,6 +268,8 @@ class ck_main(Frame):
             # buttons
         self.btn_list = Button(self, image = self.img_btn_list, borderwidth = 0, bg = COL_BG,
             activebackground = COL_BG) # list button
+        self.btn_logout = Button(self, image = self.img_btn_logout, borderwidth = 0, bg = COL_BG,
+            activebackground = COL_BG) # list button
         
         # widgets positioning
             # background
@@ -274,8 +279,34 @@ class ck_main(Frame):
         self.en_date.place(x = 536, y = 80, anchor = "nw")
             # buttons
         self.btn_list.place(x = 664, y = 74, anchor = "nw")
+        self.btn_logout.place(x = 664, y = (74 - 36) / 2, anchor = "nw")
+
+# == GUI: WELCOME WINDOW =====================================================================
+
+class ck_welcome(Tk):
+    # constructor method
+    def __init__(self, *args, **kwargs):
+        # constructor method for Tk
+        Tk.__init__(self, *args, **kwargs)
+
+        self.geometry(f"{str(GLOBAL_W)}x{str(GLOBAL_H)}+280+120")
+        self.overrideredirect(1)
+
+        # prepare video
+        self.vid_src = SRC + "ck_welcome.mp4" # video's path
+        self.lb_vid = Label(self)
+        self.lb_vid.pack() # set video's label
+        self.vid = tkvideo(self.vid_src, self.lb_vid, loop = 0, size = (800, 600))
+
+        # play the video
+        self.vid.play()
+
+        self.after(7000, self.destroy)
 
 # == MAIN PROGRAM ============================================================================
+
+welcome = ck_welcome()
+welcome.mainloop()
 
 app = Ck()
 app.mainloop()
