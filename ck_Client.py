@@ -14,6 +14,9 @@ import time # for video pause
 import socket
 import threading # prevent socket methods from freezing the GUI
 
+# data
+from array import *
+
 # == CONSTANT VALUES =========================================================================
 
 # GUI
@@ -39,6 +42,7 @@ FORMAT = 'utf-8' # encoding & decoding format
 DISCON_MSG = "!DISCONNECT" # disconnect message
 MSG_LG_TRUE = "!LG_TRUE" # login successful
 MSG_LG_FALSE = "!LG_FALSE" # login failed
+SUBMIT = "!SUBMIT"
 
 # == VARIABLES ===============================================================================
 
@@ -49,6 +53,13 @@ login_type = 0 # 0 = login; 1 = register
 server = "" # server ip
 addr = () # server address
 username = ""; password = ""
+
+# Send & receiving
+submit = False
+sm_city = ""; sm_date = ""
+
+# showing data
+data = []
 
 # triggers
 trg_logout = False # logout of the main window
@@ -117,26 +128,26 @@ class Ck(Tk):
     def cl_connect(self, username):
         global client, conn_status, addr, login_type, vid_start # enable edit for these variables
         # create a socket for the client using (type: IPv4, mode: TCP)
-        try:
-            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            client.connect(addr)
+        #try:
+        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client.connect(addr)
 
-            self.cl_send(f'{login_type}') # let server know if the user is logging in or registering
-            self.cl_send(username) # send username to the server
-            self.cl_send(password) # send password to the server
-            self.cl_send('1') # send usertype (admin/client) to the server
-            
-            lg_ok = (self.cl_get() == MSG_LG_TRUE) # check if login/register is successful
-            if (lg_ok):
-                self.show_frame("ck_main")
-                self.cl_main()
+        self.cl_send(f'{login_type}') # let server know if the user is logging in or registering
+        self.cl_send(username) # send username to the server
+        self.cl_send(password) # send password to the server
+        self.cl_send('1') # send usertype (admin/client) to the server
+        
+        lg_ok = (self.cl_get() == MSG_LG_TRUE) # check if login/register is successful
+        if (lg_ok):
+            self.show_frame("ck_main")
+            self.cl_main()
+        else:
+            if (login_type == 1):
+                thread_mbox("WARNING!", "Registry unsuccessful.")  
             else:
-                if (login_type == 1):
-                    thread_mbox("WARNING!", "Registry unsuccessful.")  
-                else:
-                    thread_mbox("WARNING!", "Login unsuccessful.")
-        except:
-            thread_mbox("WARNING!", "Mission failed. We'll connect next time.")
+                thread_mbox("WARNING!", "Login unsuccessful.")
+        #except:
+        #    thread_mbox("WARNING!", "Mission failed. We'll connect next time.")
         
         # disconnect
         conn_status = False
@@ -159,12 +170,31 @@ class Ck(Tk):
 
     #    main method
     def cl_main(self):
-        global trg_logout # enable edit for these variables
+        global trg_logout, client, data, submit # enable edit for these variables
 
         # while connected to the server
         while (True):
-            
-            # check for disconnection via logging out
+            if (submit):
+                # submit the request
+                self.cl_send(SUBMIT)
+                self.cl_send(sm_city)
+                self.cl_send(sm_date)
+                submit = False
+
+                # get city count
+                city_count = int(self.cl_get())
+                # reset the data
+                data.clear()
+
+                # get the data
+                for city in range(city_count):
+                    feats = [] # initialize an array to store features for each (city, date)
+                    for feat in range(4):
+                        feats.append(self.cl_get()) # get each feature
+                    data.append(feats) # add (city, date) to data[]
+                    print(feats)
+
+            # check for disconnection
             if (trg_logout):
                 break
 
@@ -253,6 +283,7 @@ class ck_login(Frame):
             addr = (t_ip, PORT) # set server address
             conn_status = True # allow connection to server
             login_type = lg_type # let the server know if the user is logging in or registering
+            self.en_password.delete(0, len(t_pass)) # clear the entry for password
 
 # == GUI: MAIN WINDOW ========================================================================
 
@@ -276,7 +307,7 @@ class ck_main(Frame):
             selectbackground = COL_GRAY, relief = FLAT) # date input field
             # buttons
         self.btn_list = Button(self, image = self.img_btn_list, borderwidth = 0, bg = COL_BG,
-            activebackground = COL_BG) # list button
+            activebackground = COL_BG, command = lambda : self.rm_main_submit()) # list button
         self.btn_logout = Button(self, image = self.img_btn_logout, borderwidth = 0, bg = COL_BG,
             activebackground = COL_BG, command = lambda : self.rm_main_logout()) # list button
         
@@ -293,6 +324,21 @@ class ck_main(Frame):
     def rm_main_logout(self):
         global trg_logout # enable edit for these variables
         trg_logout = True
+
+    def rm_main_submit(self):
+        global submit, sm_city, sm_date # enable edit for these variables
+        # get submit info from input fields
+        sm_city = self.en_city.get()
+        sm_date = self.en_date.get()
+
+        # change to requesting all info if input field(s) is/are blank
+        if (sm_city == ""):
+            sm_city = "!ALL"
+        if (sm_date == ""):
+            sm_date = "!ALL"
+        
+        # enable submitting
+        submit = True
 
 # == GUI: WELCOME WINDOW =====================================================================
 
@@ -319,8 +365,8 @@ class ck_welcome(Tk):
 
 # == MAIN PROGRAM ============================================================================
 
-welcome = ck_welcome()
-welcome.mainloop()
+#welcome = ck_welcome()
+#welcome.mainloop()
 
 app = Ck()
 app.mainloop()

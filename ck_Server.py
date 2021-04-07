@@ -44,6 +44,7 @@ DB = "ck_database.db"
 DISCON_MSG = "!DISCONNECT" # disconnect message
 MSG_LG_TRUE = "!LG_TRUE" # login successful
 MSG_LG_FALSE = "!LG_FALSE" # login failed
+SUBMIT = "!SUBMIT"
 
 # == SUPPORTING METHODS ======================================================================
 
@@ -82,9 +83,9 @@ if (db_exist == False):
     # temperature (celcius, according to date)
     cur.execute("""CREATE TABLE tb_temp(
         id TEXT,
+        date TEXT,
         temp INTEGER,
-        status TEXT,
-        date TEXT
+        status TEXT
     )""")
 
 # insert data
@@ -101,11 +102,11 @@ df_cities = [
             ]
     # default temperatures
 df_temp =   [
-                ('SGN', 35, 'Sunny', '2021-04-01'),
-                ('SGN', 31, 'Cloudy', '2021-04-02'),
-                ('HAN', 25, 'Sunny', '2021-04-01'),
-                ('HAN', 21, 'Rainy', '2021-04-02'),
-                ('DLT', 17, 'Windy', '2021-04-01')
+                ('SGN', '2021-04-01', 35, 'Sunny'),
+                ('SGN', '2021-04-02', 31, 'Cloudy'),
+                ('HAN', '2021-04-01', 25, 'Sunny'),
+                ('HAN', '2021-04-02', 21, 'Rainy'),
+                ('DLT', '2021-04-01', 17, 'Windy')
             ]
     # insert the default data if database is not created before
 if (db_exist == False):
@@ -184,6 +185,7 @@ def sv_start(): # server start
     global server # enable edit on these varibles
     btn_start.config(state = "disabled") # disable start button
     btn_stop.config(state = "normal") # enable stop button
+
     # create a socket for the server using (type: IPv4, method: TCP)
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     tm_print("Server started.")
@@ -257,6 +259,9 @@ def sv_handle_login(conn, addr): # client's connection and address
 # handle a single client
 def sv_handle_client(conn, addr, cl_name): # client's connection and address
     global cl_list # enable edit for these variables
+    
+    # for submitting
+    sm_city = ""; sm_date = ""
 
     cl_list.append(cl_name) # add client to list
     idx = sv_get_client(cl_list, cl_name) # get client's name via its index
@@ -269,8 +274,42 @@ def sv_handle_client(conn, addr, cl_name): # client's connection and address
         if (msg_len): # check if message is not null
             msg_len = int(msg_len) # convert it to integer
             msg = conn.recv(msg_len).decode(FORMAT) # get the message
+
+            # handle types of messages
+                # client disconnects
             if (msg == DISCON_MSG):
                 break
+                # client requests information
+            if (msg == SUBMIT):
+                # get request info
+                sm_city = sv_get_msg(conn) # get city id
+                sm_date = sv_get_msg(conn) # get date
+                with sql.connect(DB) as con:
+                    t_cur = con.cursor() # create new db cursor to the thread
+                    # check the type of message
+                    #if (sm_city == "!ALL"):
+                    # get the count of the cities requested
+                    # the client needs this count to know how many cities to receive
+                    t_cur.execute(f"""  SELECT COUNT(*)
+                                        FROM tb_city c JOIN tb_temp t ON c.id = t.id
+                                    """)
+                    city_count = t_cur.fetchone()[0] # get the count
+                    sv_send_msg(str(city_count), conn) # send it
+
+                    # result: (c.id, c.name, t.id, t.date, t.temp, t.status, )
+                    t_cur.execute(f"""  SELECT c.*, t.*
+                                        FROM tb_city c JOIN tb_temp t ON c.id = t.id
+                                    """)
+                    rows = t_cur.fetchall() # get the result query
+                    # send the info to the client
+                    for row in rows:
+                        sv_send_msg(row[1], conn) # city name
+                        sv_send_msg(row[3], conn) # date in question
+                        sv_send_msg(str(row[4]), conn) # temperature
+                        sv_send_msg(row[5], conn) # status
+
+                    tm_print(f"{cl_name_show} Requesting data...")
+                    continue
             
             tm_print(f"{cl_name_show} {msg}")
     
@@ -311,6 +350,7 @@ def sv_stop():
     btn_start.config(state = "normal") # enable start button
     btn_stop.config(state = "disable") # disable stop button
     # shut down and close the server
+
     try:
         server.shutdown(socket.SHUT_RDWR)
         sv_active = False
