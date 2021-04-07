@@ -50,8 +50,8 @@ server = "" # server ip
 addr = () # server address
 username = ""; password = ""
 
-# video
-start_video = False
+# triggers
+trg_logout = False # logout of the main window
 
 # == SUPPORTING METHODS ======================================================================
 
@@ -95,6 +95,7 @@ class Ck(Tk):
             frame.grid(row = 0, column = 0, sticky = "nsew")
 
         self.show_frame("ck_login")
+        
         check_conn = threading.Thread(target = self.cl_check_conn, daemon = True) # daemon: kill the thread when the program exits
         check_conn.start()
         
@@ -134,10 +135,10 @@ class Ck(Tk):
                     thread_mbox("WARNING!", "Registry unsuccessful.")  
                 else:
                     thread_mbox("WARNING!", "Login unsuccessful.")
-                #client.close()
         except:
             thread_mbox("WARNING!", "Mission failed. We'll connect next time.")
         
+        # disconnect
         conn_status = False
         
     #   send messages
@@ -158,8 +159,17 @@ class Ck(Tk):
 
     #    main method
     def cl_main(self):
-        self.cl_send("Chào bồ tui nìa ó nhooo!!! >w<")
-        self.cl_send("Iu bồ tui lém óoo!!! >w<")
+        global trg_logout # enable edit for these variables
+
+        # while connected to the server
+        while (True):
+            
+            # check for disconnection via logging out
+            if (trg_logout):
+                break
+
+        trg_logout = False
+        self.show_frame("ck_login")
         self.cl_send(DISCON_MSG)
 
 # == GUI: LOGIN WINDOW =======================================================================
@@ -227,7 +237,7 @@ class ck_login(Frame):
 
     # check if login is valid
     def rm_login_check(self, lg_type):
-        global username, password, conn_status, server, addr, login_type, start_video
+        global username, password, conn_status, server, addr, login_type # enable edit for these variables
         # Get username, password & server ip in the input fields
         t_user = self.en_username.get()
         t_pass = self.en_password.get()
@@ -243,7 +253,6 @@ class ck_login(Frame):
             addr = (t_ip, PORT) # set server address
             conn_status = True # allow connection to server
             login_type = lg_type # let the server know if the user is logging in or registering
-            start_video = True # allow welcome video to play
 
 # == GUI: MAIN WINDOW ========================================================================
 
@@ -269,7 +278,7 @@ class ck_main(Frame):
         self.btn_list = Button(self, image = self.img_btn_list, borderwidth = 0, bg = COL_BG,
             activebackground = COL_BG) # list button
         self.btn_logout = Button(self, image = self.img_btn_logout, borderwidth = 0, bg = COL_BG,
-            activebackground = COL_BG) # list button
+            activebackground = COL_BG, command = lambda : self.rm_main_logout()) # list button
         
         # widgets positioning
             # background
@@ -280,6 +289,10 @@ class ck_main(Frame):
             # buttons
         self.btn_list.place(x = 664, y = 74, anchor = "nw")
         self.btn_logout.place(x = 664, y = (74 - 36) / 2, anchor = "nw")
+
+    def rm_main_logout(self):
+        global trg_logout # enable edit for these variables
+        trg_logout = True
 
 # == GUI: WELCOME WINDOW =====================================================================
 
@@ -301,6 +314,7 @@ class ck_welcome(Tk):
         # play the video
         self.vid.play()
 
+        # destroy the window
         self.after(7000, self.destroy)
 
 # == MAIN PROGRAM ============================================================================
