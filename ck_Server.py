@@ -106,7 +106,7 @@ df_temp =   [
                 ('SGN', '2021-04-02', 31, 'Cloudy'),
                 ('HAN', '2021-04-01', 25, 'Sunny'),
                 ('HAN', '2021-04-02', 21, 'Rainy'),
-                ('DLT', '2021-04-01', 17, 'Windy')
+                ('DLT', '2021-04-01', 17, 'Foggy')
             ]
     # insert the default data if database is not created before
 if (db_exist == False):
@@ -281,34 +281,7 @@ def sv_handle_client(conn, addr, cl_name): # client's connection and address
                 break
                 # client requests information
             if (msg == SUBMIT):
-                # get request info
-                sm_city = sv_get_msg(conn) # get city id
-                sm_date = sv_get_msg(conn) # get date
-                with sql.connect(DB) as con:
-                    t_cur = con.cursor() # create new db cursor to the thread
-                    # check the type of message
-                    #if (sm_city == "!ALL"):
-                    # get the count of the cities requested
-                    # the client needs this count to know how many cities to receive
-                    t_cur.execute(f"""  SELECT COUNT(*)
-                                        FROM tb_city c JOIN tb_temp t ON c.id = t.id
-                                    """)
-                    city_count = t_cur.fetchone()[0] # get the count
-                    sv_send_msg(str(city_count), conn) # send it
-
-                    # result: (c.id, c.name, t.id, t.date, t.temp, t.status, )
-                    t_cur.execute(f"""  SELECT c.*, t.*
-                                        FROM tb_city c JOIN tb_temp t ON c.id = t.id
-                                    """)
-                    rows = t_cur.fetchall() # get the result query
-                    # send the info to the client
-                    for row in rows:
-                        sv_send_msg(row[1], conn) # city name
-                        sv_send_msg(row[3], conn) # date in question
-                        sv_send_msg(str(row[4]), conn) # temperature
-                        sv_send_msg(row[5], conn) # status
-
-                    tm_print(f"{cl_name_show} Requesting data...")
+                    sv_handle_client_send_data(conn, cl_name_show)
                     continue
             
             tm_print(f"{cl_name_show} {msg}")
@@ -319,6 +292,54 @@ def sv_handle_client(conn, addr, cl_name): # client's connection and address
     # close the connection
     tm_print(f"{cl_name_show} Disconnected.")
     conn.close()
+
+# send requested data to client
+def sv_handle_client_send_data(conn, cl_name):
+    # get request info
+    tm_print(f"{cl_name} Requesting data...")
+    sm_city = sv_get_msg(conn) # get city id
+    sm_date = sv_get_msg(conn) # get date
+    tm_print(f"{cl_name} Requested City ID: {sm_city}.")
+    tm_print(f"{cl_name} Requested Date: {sm_date}.")
+    with sql.connect(DB) as con:
+        t_cur = con.cursor() # create new db cursor to the thread
+
+        # constructing the WHERE clause
+        tm_print(f"{cl_name} Establishing query...")
+            # WHERE sub-clauses
+        where_city = f"c.id = '{sm_city}'" if sm_city != "!ALL" else "" # city
+        where_date = f"t.date = '{sm_date}'" if sm_date != "!ALL" else "" # date
+        where_head = "WHERE" if (sm_city != "!ALL" or sm_date != "!ALL") else "" # WHERE
+        where_and  = "AND" if (sm_city != "!ALL" and sm_date != "!ALL") else "" # AND
+            # full clause
+        where_full = f"{where_head} {where_city} {where_and} {where_date}"
+
+        tm_print(f"{cl_name} Running query...")
+        # get the count of the cities requested
+        # the client needs this count to know how many cities to receive
+        t_cur.execute(f"""  SELECT COUNT(*)
+                            FROM tb_city c JOIN tb_temp t ON c.id = t.id 
+                            {where_full}
+                        """)
+        city_count = t_cur.fetchone()[0] # get the count
+        sv_send_msg(str(city_count), conn) # send it
+
+        # result: (c.id, c.name, t.id, t.date, t.temp, t.status, )
+        t_cur.execute(f"""  SELECT c.*, t.*
+                            FROM tb_city c JOIN tb_temp t ON c.id = t.id
+                            {where_full}
+                        """)
+        rows = t_cur.fetchall() # get the result query
+
+        tm_print(f"{cl_name} Sending requested data...")
+        # send the info to the client
+        for row in rows:
+            sv_send_msg(row[1], conn) # city name
+            sv_send_msg(row[3], conn) # date in question
+            sv_send_msg(str(row[4]), conn) # temperature
+            sv_send_msg(row[5], conn) # status
+
+        tm_print(f"{cl_name} Requested data are sent to client.")
 
 def sv_send_msg(a_msg, conn):
     msg = a_msg.encode(FORMAT) # encode the message

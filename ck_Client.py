@@ -13,6 +13,7 @@ import time # for video pause
 # socket
 import socket
 import threading # prevent socket methods from freezing the GUI
+import os
 
 # data
 from array import *
@@ -22,13 +23,16 @@ from array import *
 # GUI
     # colors
 COL_BG = '#F5FEFF' # balgground color
-COL_BLAlg = '#25282B' # blalg variant
+COL_BLACK = '#25282B' # blalg variant
 COL_GRAY = '#879193' # gray variant
     # size & position
 GLOBAL_W = 800; GLOBAL_H = 600
 CEN_X = GLOBAL_W / 2; CEN_Y = GLOBAL_H / 2
+WIN_OFFSETX = 280; WIN_OFFSETY = 142
     # font
 FNT_MAIN = ("Quicksand Bold", 12)
+FNT_DP = ("Quicksand Bold", 24)
+FNT_DP_SMOL = ("Quicksand Medium", 16)
 
 # Others
 SRC = "Resources/Client/" # 'Resources' directory
@@ -60,6 +64,7 @@ sm_city = ""; sm_date = ""
 
 # showing data
 data = []
+display_frame = False
 
 # triggers
 trg_logout = False # logout of the main window
@@ -82,7 +87,7 @@ class Ck(Tk):
 
         self.title('Cloud Kit Weather Forecast') # set title
         self.iconbitmap('Resources/ico_logo.ico') # set icon
-        self.geometry(f"{str(GLOBAL_W)}x{str(GLOBAL_H)}+280+120") # set original size
+        self.geometry(f"{str(GLOBAL_W)}x{str(GLOBAL_H)}+{WIN_OFFSETX}+{WIN_OFFSETY}") # set original size
         self.configure(bg = COL_BG) # background color
         self.resizable(0, 0) # allow no resizing
 
@@ -128,26 +133,27 @@ class Ck(Tk):
     def cl_connect(self, username):
         global client, conn_status, addr, login_type, vid_start # enable edit for these variables
         # create a socket for the client using (type: IPv4, mode: TCP)
-        #try:
-        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client.connect(addr)
+        try:
 
-        self.cl_send(f'{login_type}') # let server know if the user is logging in or registering
-        self.cl_send(username) # send username to the server
-        self.cl_send(password) # send password to the server
-        self.cl_send('1') # send usertype (admin/client) to the server
-        
-        lg_ok = (self.cl_get() == MSG_LG_TRUE) # check if login/register is successful
-        if (lg_ok):
-            self.show_frame("ck_main")
-            self.cl_main()
-        else:
-            if (login_type == 1):
-                thread_mbox("WARNING!", "Registry unsuccessful.")  
+            client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client.connect(addr)
+
+            self.cl_send(f'{login_type}') # let server know if the user is logging in or registering
+            self.cl_send(username) # send username to the server
+            self.cl_send(password) # send password to the server
+            self.cl_send('1') # send usertype (admin/client) to the server
+            
+            lg_ok = (self.cl_get() == MSG_LG_TRUE) # check if login/register is successful
+            if (lg_ok):
+                self.show_frame("ck_main")
+                self.cl_main()
             else:
-                thread_mbox("WARNING!", "Login unsuccessful.")
-        #except:
-        #    thread_mbox("WARNING!", "Mission failed. We'll connect next time.")
+                if (login_type == 1):
+                    thread_mbox("WARNING!", "Registry unsuccessful.")  
+                else:
+                    thread_mbox("WARNING!", "Login unsuccessful.")
+        except:
+            thread_mbox("WARNING!", "Mission failed. We'll connect next time.")
         
         # disconnect
         conn_status = False
@@ -170,10 +176,12 @@ class Ck(Tk):
 
     #    main method
     def cl_main(self):
-        global trg_logout, client, data, submit # enable edit for these variables
+        global trg_logout, client, data, submit, display_frame # enable edit for these variables
 
         # while connected to the server
         while (True):
+
+            # check if client requests data
             if (submit):
                 # submit the request
                 self.cl_send(SUBMIT)
@@ -193,6 +201,9 @@ class Ck(Tk):
                         feats.append(self.cl_get()) # get each feature
                     data.append(feats) # add (city, date) to data[]
                     print(feats)
+
+                display_frame = True
+                print("hoi mò")
 
             # check for disconnection
             if (trg_logout):
@@ -321,9 +332,15 @@ class ck_main(Frame):
         self.btn_list.place(x = 664, y = 74, anchor = "nw")
         self.btn_logout.place(x = 664, y = (74 - 36) / 2, anchor = "nw")
 
+        # display canvas
+            # frames containing data
+        self.dp_frames = []
+        self.dp_pages = []
+
     def rm_main_logout(self):
-        global trg_logout # enable edit for these variables
+        global trg_logout, data # enable edit for these variables
         trg_logout = True
+        data.clear()
 
     def rm_main_submit(self):
         global submit, sm_city, sm_date # enable edit for these variables
@@ -340,6 +357,50 @@ class ck_main(Frame):
         # enable submitting
         submit = True
 
+        # display the frames
+        self.rm_main_display()
+
+    def rm_main_display(self):
+        global data, display_frame # enable edit for these variables
+        print("hoi mò 1")
+
+        while (True):
+            if (display_frame):
+                
+                # get data[]
+                if (data):
+                    self.dp_frames.clear()
+                    # create display frames
+                    for idx, frame in enumerate(data):
+                        frame = dp_frame(self.cv_display, data[idx][3])
+                        self.dp_frames.append(frame)
+                    
+                # store data in pages
+                
+                display_frame = False
+                break
+
+        print("hoi mò 2")
+
+# == GUI: MAIN WINDOW - DISPLAY FRAME ========================================================
+
+class dp_frame(Frame):
+    def __init__(self, controller, status):
+        Frame.__init__(self, controller)
+        
+        # images
+        SRC_DP = SRC + "Display/"
+        self.img_back = PhotoImage(file = SRC_DP + "spr_data_frame.png")
+        self.img_icon = PhotoImage(file = SRC_DP + f"spr_data_icon_{status}.png")
+
+        # widgets
+        self.lb_back = Label(self, image = self.img_back, bg = COL_BG)
+        self.lb_icon = Label(self, image = self.img_icon, bg = COL_BG)
+
+        # widget placement
+        self.lb_back.pack()
+        self.lb_icon.place(x = 10, y = 10, anchor = "nw")
+
 # == GUI: WELCOME WINDOW =====================================================================
 
 class ck_welcome(Tk):
@@ -348,7 +409,7 @@ class ck_welcome(Tk):
         # constructor method for Tk
         Tk.__init__(self, *args, **kwargs)
 
-        self.geometry(f"{str(GLOBAL_W)}x{str(GLOBAL_H)}+280+120")
+        self.geometry(f"{str(GLOBAL_W)}x{str(GLOBAL_H)}+{WIN_OFFSETX}+{WIN_OFFSETY}")
         self.overrideredirect(1)
 
         # prepare video
