@@ -333,9 +333,13 @@ class ck_main(Frame):
         self.btn_logout.place(x = 664, y = (74 - 36) / 2, anchor = "nw")
 
         # display canvas
-            # frames containing data
-        self.dp_frames = []
+            # dp_pages[page_number][frames]
         self.dp_pages = []
+        self.page_reader = 0
+
+        if (data):
+            for idx, pg in enumerate(self.dp_pages[page_reader]):
+                pg.place(x = 32, y = 139 + idx)
 
     def rm_main_logout(self):
         global trg_logout, data # enable edit for these variables
@@ -366,17 +370,26 @@ class ck_main(Frame):
 
         while (True):
             if (display_frame):
-                
-                # get data[]
+                # get data
                 if (data):
-                    self.dp_frames.clear()
-                    # create display frames
-                    for idx, frame in enumerate(data):
-                        frame = dp_frame(self.cv_display, data[idx][3])
-                        self.dp_frames.append(frame)
+                    self.dp_pages.clear() # clear the list of pages
+                    page_idx = 0 # page number
+                    frame_cnt = 0 # the number of frames created
+                    for page in range(len(data)): # for each page
+                        pg = []
+                        for frame in range(4):
+                            if (frame_cnt == len(data)):
+                                break
+                            frm = dp_frame(self, data[frame][0], data[frame][1], 
+                                data[frame][2], data[frame][3])
+                            pg.append(frm) # add the frame to the page
+                            frame_cnt += 1
+                        self.dp_pages.append(pg) # add 4 frames
                     
-                # store data in pages
-                
+                # display the first page
+                for idx in range(4):
+                    self.dp_pages[0][idx].place(x = 32, y = 134 + idx * 112, anchor = "nw")
+
                 display_frame = False
                 break
 
@@ -385,7 +398,7 @@ class ck_main(Frame):
 # == GUI: MAIN WINDOW - DISPLAY FRAME ========================================================
 
 class dp_frame(Frame):
-    def __init__(self, controller, status):
+    def __init__(self, controller, city, date, temp, status):
         Frame.__init__(self, controller)
         
         # images
