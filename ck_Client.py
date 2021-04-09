@@ -25,6 +25,7 @@ from array import *
 COL_BG = '#F5FEFF' # balgground color
 COL_BLACK = '#25282B' # blalg variant
 COL_GRAY = '#879193' # gray variant
+
     # size & position
 GLOBAL_W = 800; GLOBAL_H = 600
 CEN_X = GLOBAL_W / 2; CEN_Y = GLOBAL_H / 2
@@ -84,7 +85,7 @@ class Ck(Tk):
     def __init__(self, *args, **kwargs):
         # constructor method for Tk
         Tk.__init__(self, *args, **kwargs)
-
+        
         self.title('Cloud Kit Weather Forecast') # set title
         self.iconbitmap('Resources/ico_logo.ico') # set icon
         self.geometry(f"{str(GLOBAL_W)}x{str(GLOBAL_H)}+{WIN_OFFSETX}+{WIN_OFFSETY}") # set original size
@@ -302,7 +303,7 @@ class ck_main(Frame):
     # constructor method
     def __init__(self, parent, controller):
         Frame.__init__(self, parent)
-        
+
         # background & images  
         self.bg_main = PhotoImage(file = SRC + "bg_main.png") # load background
         self.img_btn_list = PhotoImage(file = SRC + "spr_btn_list.png") # list button
@@ -388,7 +389,7 @@ class ck_main(Frame):
                     
                 # display the first page
                 for idx in range(4):
-                    self.dp_pages[0][idx].place(x = 32, y = 134 + idx * 112, anchor = "nw")
+                    self.dp_pages[0][idx].place(x = 36, y = 140+ idx * 100, anchor = "nw")
 
                 display_frame = False
                 break
@@ -400,19 +401,22 @@ class ck_main(Frame):
 class dp_frame(Frame):
     def __init__(self, controller, city, date, temp, status):
         Frame.__init__(self, controller)
-        
+
         # images
         SRC_DP = SRC + "Display/"
         self.img_back = PhotoImage(file = SRC_DP + "spr_data_frame.png")
         self.img_icon = PhotoImage(file = SRC_DP + f"spr_data_icon_{status}.png")
+        
+        self.canvas = Canvas(self, width = 736, height = 90, bg = COL_BG, bd = 0,
+            highlightthickness = 0, relief = 'ridge') # create canvas
+        self.drawCanvas()
+        self.canvas.pack()
+
+    def drawCanvas(self):
 
         # widgets
-        self.lb_back = Label(self, image = self.img_back, bg = COL_BG)
-        self.lb_icon = Label(self, image = self.img_icon, bg = COL_BG)
-
-        # widget placement
-        self.lb_back.pack()
-        self.lb_icon.place(x = 10, y = 10, anchor = "nw")
+        self.canvas.create_image(0, 0, anchor = "nw", image = self.img_back)
+        self.canvas.create_image(6, 6, anchor = "nw", image = self.img_icon)
 
 # == GUI: WELCOME WINDOW =====================================================================
 
