@@ -79,7 +79,7 @@ def thread_mbox(title, body):
 
 # Convert string date format
 def date_convert(date):
-    return f"{date[6:8:1]}/{date[3:5:1]}/20{date[0:2:1]}"
+    return f"{date[8:10:1]}/{date[5:7:1]}/{date[0:4:1]}"
 
 # == GUI: MAIN WINDOW & CLIENT ===============================================================
 

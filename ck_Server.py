@@ -113,7 +113,7 @@ df_temp =   [
 df_stat = ['Sunny', 'Cloudy', 'Rainy', 'Foggy']
 df_temp = []
 if (not db_exist):
-    cur_month = date.today().strftime("%y-%m-")
+    cur_month = date.today().strftime("20" + "%y-%m-")
     cur_date = date.today()
     for city_idx in df_cities:
         for date_idx in range(7):
@@ -324,8 +324,7 @@ def sv_handle_client_send_data(conn, cl_name):
     # print the requested info
     tm_print(f"{cl_name} Requested City ID: {print_city}.")
     tm_print(f"{cl_name} Requested Date: {print_date}.")
-    # change to current date if date entry is blank
-    sm_date = date.today().strftime("%y-%m-%d")
+
     with sql.connect(DB) as con:
         t_cur = con.cursor() # create new db cursor to the thread
 
@@ -336,6 +335,13 @@ def sv_handle_client_send_data(conn, cl_name):
         where_date = f"t.date = '{sm_date}'" # date
         where_head = "WHERE" # WHERE
         where_and  = "AND" if sm_city != "!BLANK_CITY" else "" # AND
+            # Sub-clauses edit
+        if (sm_date == "!BLANK_DATE"):
+            if (sm_city == "!BLANK_CITY"): # if city entry is also blank
+                cur_date = "20" + date.today().strftime("%y-%m-%d")
+                where_date = f"t.date = '{cur_date}'" # get current date
+            else: # if city entry is not blank (duh)
+                where_date = f"DATE(t.date) >= DATE(t.date, '-7 day')" # get the last 7 days
             # full clause
         where_full = f"{where_head} {where_city} {where_and} {where_date}"
 
