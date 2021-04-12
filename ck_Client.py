@@ -31,8 +31,8 @@ CEN_X = GLOBAL_W / 2; CEN_Y = GLOBAL_H / 2
 WIN_OFFSETX = 280; WIN_OFFSETY = 142
     # font
 FNT_MAIN = ("Quicksand Bold", 12)
-FNT_DP = ("Quicksand Bold", 24)
-FNT_DP_SMOL = ("Quicksand Medium", 16)
+FNT_DP = ("Quicksand Bold", 20)
+FNT_DP_SMOL = ("Quicksand Medium", 14)
 
 # Others
 SRC = "Resources/Client/" # 'Resources' directory
@@ -76,6 +76,10 @@ def thread_mbox(title, body):
     #thr_mbox = threading.Thread(target = mbox.showinfo, args = (title, body), daemon = True)
     #thr_mbox.start()
     mbox.showinfo(title, body)
+
+# Convert string date format
+def date_convert(date):
+    return f"{date[6:8:1]}/{date[3:5:1]}/20{date[0:2:1]}"
 
 # == GUI: MAIN WINDOW & CLIENT ===============================================================
 
@@ -200,7 +204,7 @@ class Ck(Tk):
                     for feat in range(4):
                         feats.append(self.cl_get()) # get each feature
                     data.append(feats) # add (city, date) to data[]
-                    print(feats)
+                    #print(feats) # for testing only
 
                 display_frame = True
                 #print("hoi mò")
@@ -358,9 +362,9 @@ class ck_main(Frame):
 
         # change to requesting all info if input field(s) is/are blank
         if (sm_city == ""):
-            sm_city = "!ALL"
+            sm_city = "!ALL" # request all cities
         if (sm_date == ""):
-            sm_date = "!ALL"
+            sm_date = "!NOW" # request details of current date
         
         # enable submitting
         submit = True
@@ -389,11 +393,11 @@ class ck_main(Frame):
                             page.append(frm) # add the frame to the page
                             frame_cnt += 1
                         self.dp_pages.append(page) # add 4 frames
-                    
+                
                 # display the first page
                 for idx in range(4):
                     self.dp_pages[0][idx].place(x = 34, y = 140 + idx * 102, anchor = "nw")
-
+                
                 # handle back/next buttons
                 btn_stat = "active" # button's status
                 if (len(self.dp_pages) <= 1): # if the page is less than 2, turn them off
@@ -430,8 +434,16 @@ class dp_frame(Frame):
         SRC_DP = SRC + "Display/"
         self.img_back = PhotoImage(file = SRC_DP + "spr_data_frame.png")
         self.img_icon = PhotoImage(file = SRC_DP + f"spr_data_icon_{status}.png")
+
+        # texts
+        self.new_date = date_convert(date)
+        self.city = city
+        self.status = status
+        self.temp = temp
         
-        self.canvas = Canvas(self, width = 736, height = 90, bg = COL_BG, bd = 0,
+        # canvas
+        self.cv_w = 736; self.cv_h = 90
+        self.canvas = Canvas(self, width = self.cv_w, height = self.cv_h, bg = COL_BG, bd = 0,
             highlightthickness = 0, relief = 'ridge') # create canvas
         self.drawCanvas()
         self.canvas.pack()
@@ -440,6 +452,16 @@ class dp_frame(Frame):
         # images
         self.canvas.create_image(0, 0, anchor = "nw", image = self.img_back)
         self.canvas.create_image(6, 6, anchor = "nw", image = self.img_icon)
+        
+        # labels
+            # city - date
+        self.canvas.create_text(96, 10, anchor = "nw", text = self.city + " - " + self.new_date, font = FNT_DP)
+            # status
+        self.canvas.create_text(96, self.cv_h - 10, anchor = "sw", text = self.status, font = FNT_DP_SMOL)
+            # temp
+        cir_x = self.cv_w - 48; cir_y = self.cv_h / 2
+        self.canvas.create_oval(cir_x - 25, cir_y - 23, cir_x + 23, cir_y + 25, fill = "white", outline = "")
+        self.canvas.create_text(cir_x, cir_y, anchor = "center", text = self.temp, font = FNT_DP)
 
 # == GUI: WELCOME WINDOW =====================================================================
 
@@ -466,8 +488,8 @@ class ck_welcome(Tk):
 
 # == MAIN PROGRAM ============================================================================
 
-welcome = ck_welcome()
-welcome.mainloop()
+#welcome = ck_welcome()
+#welcome.mainloop()
 
 app = Ck()
 app.mainloop()

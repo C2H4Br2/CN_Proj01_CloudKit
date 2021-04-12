@@ -7,10 +7,12 @@ from tkinter import * # GUI
 from tkinter import messagebox as mbox # message box
 import tkinter.font as TkFont # font
 import datetime # get time for each log in terminal
+from datetime import date # get current date
 
 # SQL
 import sqlite3 as sql
 import os.path # check for database's existence
+import random # create random data
 
 # Socket
 import socket
@@ -101,18 +103,34 @@ df_cities = [
                 ('DLT', 'Đà Lạt')
             ]
     # default temperatures
+'''
 df_temp =   [
-                ('SGN', '2021-04-01', 35, 'Sunny'),
-                ('SGN', '2021-04-02', 31, 'Cloudy'),
-                ('HAN', '2021-04-01', 25, 'Sunny'),
-                ('HAN', '2021-04-02', 21, 'Rainy'),
-                ('DLT', '2021-04-01', 17, 'Foggy')
+                ('SGN', '2021-04-05', 35, 'Sunny'),
+                ('SGN', '2021-04-06', 31, 'Cloudy'),
+                ('SGN', '2021-04-07', 25, 'Rainy')
             ]
+'''
+df_stat = ['Sunny', 'Cloudy', 'Rainy', 'Foggy']
+df_temp = []
+if (not db_exist):
+    cur_month = date.today().strftime("%y-%m-")
+    cur_date = date.today()
+    for city_idx in df_cities:
+        for date_idx in range(7):
+            df_temp_dt = []
+            df_temp_dt.append(f'{city_idx[0]}')
+            df_temp_dt.append(f'{cur_month}{(cur_date - datetime.timedelta(days = date_idx)).strftime("%d")}')
+            df_temp_dt.append(f'{random.randint(20, 38)}') 
+            df_temp_dt.append(f'{df_stat[random.randint(0, 3)]}')
+            df_temp.append(df_temp_dt)
     # insert the default data if database is not created before
 if (db_exist == False):
     cur.executemany("INSERT INTO tb_user VALUES (?, ?, ?)", df_users)
     cur.executemany("INSERT INTO tb_city VALUES (?, ?)", df_cities)
     cur.executemany("INSERT INTO tb_temp VALUES (?, ?, ?, ?)", df_temp)
+
+for city_idx in df_temp:
+    print(city_idx)
 
 # commit all commands
 if (db_exist == False):
@@ -305,16 +323,16 @@ def sv_handle_client_send_data(conn, cl_name):
         t_cur = con.cursor() # create new db cursor to the thread
 
         # constructing the WHERE clause
-        tm_print(f"{cl_name} Establishing query...")
+        #tm_print(f"{cl_name} Establishing query...")
             # WHERE sub-clauses
         where_city = f"c.id = '{sm_city}'" if sm_city != "!ALL" else "" # city
-        where_date = f"t.date = '{sm_date}'" if sm_date != "!ALL" else "" # date
-        where_head = "WHERE" if (sm_city != "!ALL" or sm_date != "!ALL") else "" # WHERE
-        where_and  = "AND" if (sm_city != "!ALL" and sm_date != "!ALL") else "" # AND
+        where_date = f"t.date = '{sm_date}'" if sm_date != "!NOW" else "" # date
+        where_head = "WHERE" if (sm_city != "!ALL" or sm_date != "!NOW") else "" # WHERE
+        where_and  = "AND" if (sm_city != "!ALL" and sm_date != "!NOW") else "" # AND
             # full clause
         where_full = f"{where_head} {where_city} {where_and} {where_date}"
 
-        tm_print(f"{cl_name} Running query...")
+        #tm_print(f"{cl_name} Running query...")
         # get the count of the cities requested
         # the client needs this count to know how many cities to receive
         t_cur.execute(f"""  SELECT COUNT(*)
@@ -331,7 +349,7 @@ def sv_handle_client_send_data(conn, cl_name):
                         """)
         rows = t_cur.fetchall() # get the result query
 
-        tm_print(f"{cl_name} Sending requested data...")
+        #tm_print(f"{cl_name} Sending requested data...")
         # send the info to the client
         for row in rows:
             sv_send_msg(row[1], conn) # city name
@@ -339,7 +357,7 @@ def sv_handle_client_send_data(conn, cl_name):
             sv_send_msg(str(row[4]), conn) # temperature
             sv_send_msg(row[5], conn) # status
 
-        tm_print(f"{cl_name} Requested data are sent to client.")
+        tm_print(f"{cl_name} Requested data sent to client.")
 
 def sv_send_msg(a_msg, conn):
     msg = a_msg.encode(FORMAT) # encode the message
