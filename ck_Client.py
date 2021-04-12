@@ -362,9 +362,9 @@ class ck_main(Frame):
 
         # change to requesting all info if input field(s) is/are blank
         if (sm_city == ""):
-            sm_city = "!ALL" # request all cities
+            sm_city = "!BLANK_CITY" # request all cities
         if (sm_date == ""):
-            sm_date = "!NOW" # request details of current date
+            sm_date = "!BLANK_DATE" # request details of current date
         
         # enable submitting
         submit = True

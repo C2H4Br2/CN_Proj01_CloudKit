@@ -315,20 +315,27 @@ def sv_handle_client(conn, addr, cl_name): # client's connection and address
 def sv_handle_client_send_data(conn, cl_name):
     # get request info
     tm_print(f"{cl_name} Requesting data...")
+    # get the info
     sm_city = sv_get_msg(conn) # get city id
     sm_date = sv_get_msg(conn) # get date
-    tm_print(f"{cl_name} Requested City ID: {sm_city}.")
-    tm_print(f"{cl_name} Requested Date: {sm_date}.")
+    # change info's type
+    print_city = sm_city if sm_city != "!BLANK_CITY" else "All"
+    print_date = sm_date if sm_date != "!BLANK_DATE" else "20" + date.today().strftime("%y-%m-%d")
+    # print the requested info
+    tm_print(f"{cl_name} Requested City ID: {print_city}.")
+    tm_print(f"{cl_name} Requested Date: {print_date}.")
+    # change to current date if date entry is blank
+    sm_date = date.today().strftime("%y-%m-%d")
     with sql.connect(DB) as con:
         t_cur = con.cursor() # create new db cursor to the thread
 
         # constructing the WHERE clause
         #tm_print(f"{cl_name} Establishing query...")
             # WHERE sub-clauses
-        where_city = f"c.id = '{sm_city}'" if sm_city != "!ALL" else "" # city
-        where_date = f"t.date = '{sm_date}'" if sm_date != "!NOW" else "" # date
-        where_head = "WHERE" if (sm_city != "!ALL" or sm_date != "!NOW") else "" # WHERE
-        where_and  = "AND" if (sm_city != "!ALL" and sm_date != "!NOW") else "" # AND
+        where_city = f"c.id = '{sm_city}'" if sm_city != "!BLANK_CITY" else "" # city
+        where_date = f"t.date = '{sm_date}'" # date
+        where_head = "WHERE" # WHERE
+        where_and  = "AND" if sm_city != "!BLANK_CITY" else "" # AND
             # full clause
         where_full = f"{where_head} {where_city} {where_and} {where_date}"
 
