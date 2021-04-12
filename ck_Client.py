@@ -13,7 +13,6 @@ import time # for video pause
 # socket
 import socket
 import threading # prevent socket methods from freezing the GUI
-import os
 
 # data
 from array import *
@@ -204,7 +203,7 @@ class Ck(Tk):
                     print(feats)
 
                 display_frame = True
-                print("hoi mò")
+                #print("hoi mò")
 
             # check for disconnection
             if (trg_logout):
@@ -308,6 +307,8 @@ class ck_main(Frame):
         self.bg_main = PhotoImage(file = SRC + "bg_main.png") # load background
         self.img_btn_list = PhotoImage(file = SRC + "spr_btn_list.png") # list button
         self.img_btn_logout = PhotoImage(file = SRC + "spr_btn_logout.png") # logout button
+        self.img_btn_back = PhotoImage(file = SRC + "spr_btn_back.png") # back button
+        self.img_btn_next = PhotoImage(file = SRC + "spr_btn_next.png") # next button
 
         # widgets
             # background
@@ -321,8 +322,12 @@ class ck_main(Frame):
         self.btn_list = Button(self, image = self.img_btn_list, borderwidth = 0, bg = COL_BG,
             activebackground = COL_BG, command = lambda : self.rm_main_submit()) # list button
         self.btn_logout = Button(self, image = self.img_btn_logout, borderwidth = 0, bg = COL_BG,
-            activebackground = COL_BG, command = lambda : self.rm_main_logout()) # list button
-        
+            activebackground = COL_BG, command = lambda : self.rm_main_logout()) # logout button
+        self.btn_back = Button(self, image = self.img_btn_back, borderwidth = 0, bg = COL_BG,
+            activebackground = COL_BG, state = "disabled", command = lambda : self.rm_main_turn(False)) # back button
+        self.btn_next = Button(self, image = self.img_btn_next, borderwidth = 0, bg = COL_BG,
+            activebackground = COL_BG, state = "disabled", command = lambda : self.rm_main_turn(True)) # next button
+
         # widgets positioning
             # background
         self.lb_bg_main.place(x = 0, y = 0, anchor = "nw")
@@ -332,15 +337,13 @@ class ck_main(Frame):
             # buttons
         self.btn_list.place(x = 664, y = 74, anchor = "nw")
         self.btn_logout.place(x = 664, y = (74 - 36) / 2, anchor = "nw")
+        self.btn_back.place(x = 549, y = 549, anchor = "nw")
+        self.btn_next.place(x = 664, y = 549, anchor = "nw")
 
-        # display canvas
+        # display canvas variables
             # dp_pages[page_number][frames]
-        self.dp_pages = []
-        self.page_reader = 0
-
-        if (data):
-            for idx, pg in enumerate(self.dp_pages[page_reader]):
-                pg.place(x = 32, y = 139 + idx)
+        self.dp_pages = [[]]
+        self.page_number = 0
 
     def rm_main_logout(self):
         global trg_logout, data # enable edit for these variables
@@ -367,34 +370,55 @@ class ck_main(Frame):
 
     def rm_main_display(self):
         global data, display_frame # enable edit for these variables
-        print("hoi mò 1")
 
         while (True):
             if (display_frame):
                 # get data
                 if (data):
                     self.dp_pages.clear() # clear the list of pages
-                    page_idx = 0 # page number
-                    frame_cnt = 0 # the number of frames created
-                    for page in range(len(data)): # for each page
-                        pg = []
+                    page_cnt = range((len(data) // 4) + int(len(data) % 4 > 0)) # reset the page count
+                    frame_cnt = 0 # the total number of frames created
+                    self.page_number = 0
+                    for page in page_cnt: # for each page
+                        page = []
                         for frame in range(4):
                             if (frame_cnt == len(data)):
-                                break
-                            frm = dp_frame(self, data[frame][0], data[frame][1], 
-                                data[frame][2], data[frame][3])
-                            pg.append(frm) # add the frame to the page
+                                break # break if data for all frames are set
+                            frm = dp_frame(self, data[frame_cnt][0], data[frame_cnt][1], 
+                                data[frame_cnt][2], data[frame_cnt][3])
+                            page.append(frm) # add the frame to the page
                             frame_cnt += 1
-                        self.dp_pages.append(pg) # add 4 frames
+                        self.dp_pages.append(page) # add 4 frames
                     
                 # display the first page
                 for idx in range(4):
-                    self.dp_pages[0][idx].place(x = 36, y = 140+ idx * 100, anchor = "nw")
+                    self.dp_pages[0][idx].place(x = 34, y = 140 + idx * 102, anchor = "nw")
+
+                # handle back/next buttons
+                btn_stat = "active" # button's status
+                if (len(self.dp_pages) <= 1): # if the page is less than 2, turn them off
+                    btn_stat = "disabled"
+                self.btn_back.configure(state = btn_stat)
+                self.btn_next.configure(state = btn_stat)
 
                 display_frame = False
                 break
 
-        print("hoi mò 2")
+    def rm_main_turn(self, next):
+        # turn the page
+        old_page = self.page_number
+        self.page_number += int(next) - int (not next) 
+        # adjust the page if it goes out of range [0; length of dp_page - 1]
+        if (self.page_number < 0):
+            self.page_number = len(self.dp_pages) - 1
+        elif (self.page_number >= len(self.dp_pages)):
+            self.page_number = 0
+        # hide the old page's frames
+        for frm_idx in range(len(self.dp_pages[old_page])):
+            self.dp_pages[old_page][frm_idx].place(x = GLOBAL_W + 1, y = 0, anchor = "nw")
+        # display the new page's frames
+        for frm_idx in range(len(self.dp_pages[self.page_number])):
+            self.dp_pages[self.page_number][frm_idx].place(x = 34, y = 140 + frm_idx * 102, anchor = "nw")
 
 # == GUI: MAIN WINDOW - DISPLAY FRAME ========================================================
 
@@ -413,8 +437,7 @@ class dp_frame(Frame):
         self.canvas.pack()
 
     def drawCanvas(self):
-
-        # widgets
+        # images
         self.canvas.create_image(0, 0, anchor = "nw", image = self.img_back)
         self.canvas.create_image(6, 6, anchor = "nw", image = self.img_icon)
 
@@ -443,8 +466,8 @@ class ck_welcome(Tk):
 
 # == MAIN PROGRAM ============================================================================
 
-#welcome = ck_welcome()
-#welcome.mainloop()
+welcome = ck_welcome()
+welcome.mainloop()
 
 app = Ck()
 app.mainloop()
