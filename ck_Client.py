@@ -206,6 +206,9 @@ class Ck(Tk):
                     data.append(feats) # add (city, date) to data[]
                     #print(feats) # for testing only
 
+                for city in data:
+                    print(city)
+
                 display_frame = True
                 #print("hoi mò")
 
@@ -352,6 +355,11 @@ class ck_main(Frame):
     def rm_main_logout(self):
         global trg_logout, data # enable edit for these variables
         trg_logout = True
+        if (self.dp_pages):
+            for pg_idx in range(len(self.dp_pages)):
+                for frm_idx in range(len(self.dp_pages[pg_idx])):
+                    self.dp_pages[pg_idx][frm_idx].destroy()
+            self.dp_pages.clear()
         data.clear()
 
     def rm_main_submit(self):
@@ -379,7 +387,13 @@ class ck_main(Frame):
             if (display_frame):
                 # get data
                 if (data):
-                    self.dp_pages.clear() # clear the list of pages
+                    # clear the list of pages
+                    if (self.dp_pages):
+                        for pg_idx in range(len(self.dp_pages)):
+                            for frm_idx in range(len(self.dp_pages[pg_idx])):
+                                self.dp_pages[pg_idx][frm_idx].destroy()
+                        self.dp_pages.clear()
+
                     page_cnt = range((len(data) // 4) + int(len(data) % 4 > 0)) # reset the page count
                     frame_cnt = 0 # the total number of frames created
                     self.page_number = 0
@@ -394,9 +408,9 @@ class ck_main(Frame):
                             frame_cnt += 1
                         self.dp_pages.append(page) # add 4 frames
                 
-                # display the first page
-                for idx in range(4):
-                    self.dp_pages[0][idx].place(x = 34, y = 140 + idx * 102, anchor = "nw")
+                    # display the first page
+                    for idx in range(len(self.dp_pages[0])):
+                        self.dp_pages[0][idx].place(x = 34, y = 140 + idx * 102, anchor = "nw")
                 
                 # handle back/next buttons
                 btn_stat = "active" # button's status
@@ -447,7 +461,7 @@ class dp_frame(Frame):
             highlightthickness = 0, relief = 'ridge') # create canvas
         self.drawCanvas()
         self.canvas.pack()
-
+        
     def drawCanvas(self):
         # images
         self.canvas.create_image(0, 0, anchor = "nw", image = self.img_back)
