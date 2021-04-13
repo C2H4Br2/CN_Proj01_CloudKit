@@ -98,9 +98,9 @@ df_users =  [
             ]
     # default cities
 df_cities = [
-                ('SGN', 'TP HCM'),
-                ('HAN', 'Hà Nội'),
-                ('DLT', 'Đà Lạt')
+                ('SGN', 'Ho Chi Minh City'),
+                ('HAN', 'Ha Noi'),
+                ('DLT', 'Da Lat')
             ]
     # default temperatures
 '''
@@ -305,6 +305,8 @@ def sv_handle_client(conn, addr, cl_name): # client's connection and address
             tm_print(f"{cl_name_show} {msg}")
     
     # remove the client from list
+        # get the idx again, should another client disconnects and mixes the list up
+    idx = sv_get_client(cl_list, cl_name) # get client's name via its index
     del cl_list[idx] # remove client from list
 
     # close the connection
@@ -321,6 +323,8 @@ def sv_handle_client_send_data(conn, cl_name):
     # change info's type
     print_city = sm_city if sm_city != "!BLANK_CITY" else "All"
     print_date = sm_date if sm_date != "!BLANK_DATE" else "20" + date.today().strftime("%y-%m-%d")
+    if (print_city != "All"):
+        print_date = "Last 7 days"
     # print the requested info
     tm_print(f"{cl_name} Requested City ID: {print_city}.")
     tm_print(f"{cl_name} Requested Date: {print_date}.")
@@ -402,17 +406,18 @@ def sv_stop():
     btn_start.config(state = "normal") # enable start button
     btn_stop.config(state = "disable") # disable stop button
     # shut down and close the server
-
+    tm_print("Shutting down server...")
     try:
         server.shutdown(socket.SHUT_RDWR)
         sv_active = False
-        tm_print("Server is shut down.")
     except:
-        tm_print("Mission failed. We'll shut down the server next time.")
+        pass
+        #tm_print("Mission failed. We'll shut down the server next time.")
     try:
         server.close()
     except:
-        tm_print("Mission failed. We'll close the server next time.")
+        pass
+        #tm_print("Mission failed. We'll close the server next time.")
 
 # == MAIN PROGRAM ============================================================================
 

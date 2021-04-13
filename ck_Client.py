@@ -65,6 +65,7 @@ sm_city = ""; sm_date = ""
 # showing data
 data = []
 display_frame = False
+gbl_lb_user = None; gbl_lb_page = ""
 
 # triggers
 trg_logout = False # logout of the main window
@@ -180,8 +181,11 @@ class Ck(Tk):
 
     #    main method
     def cl_main(self):
-        global trg_logout, client, data, submit, display_frame # enable edit for these variables
+        global trg_logout, client, data, submit, display_frame, gbl_lb_user # enable edit for these variables
 
+        # create a new display label for username
+        gbl_lb_user = Label(self, text = username, font = FNT_MAIN, bg = COL_BG)
+        gbl_lb_user.place(x = 650, y = 74 / 2, anchor = "e")
         # while connected to the server
         while (True):
 
@@ -308,6 +312,7 @@ class ck_login(Frame):
 class ck_main(Frame):
     # constructor method
     def __init__(self, parent, controller):
+        global gbl_lb_page
         Frame.__init__(self, parent)
 
         # background & images  
@@ -350,10 +355,14 @@ class ck_main(Frame):
         # display canvas variables
             # dp_pages[page_number][frames]
         self.dp_pages = [[]]
-        self.page_number = 0
+        self.page_number = 0 # current page index
+        self.page_cnt = 0 # number of pages
+            # page number display
+        self.lb_page_number = Label(self, bg = COL_BG, text = gbl_lb_page, font = FNT_MAIN)
+        self.lb_page_number.place(x = GLOBAL_W / 2, y = 549 + 35, anchor = "s")
 
     def rm_main_logout(self):
-        global trg_logout, data # enable edit for these variables
+        global trg_logout, data, gbl_lb_user # enable edit for these variables
         trg_logout = True
         if (self.dp_pages):
             for pg_idx in range(len(self.dp_pages)):
@@ -361,6 +370,8 @@ class ck_main(Frame):
                     self.dp_pages[pg_idx][frm_idx].destroy()
             self.dp_pages.clear()
         data.clear()
+        gbl_lb_user.destroy()
+        self.lb_page_number.configure(text = "")
 
     def rm_main_submit(self):
         global submit, sm_city, sm_date # enable edit for these variables
@@ -381,7 +392,7 @@ class ck_main(Frame):
         self.rm_main_display()
 
     def rm_main_display(self):
-        global data, display_frame # enable edit for these variables
+        global data, display_frame, gbl_lb_page # enable edit for these variables
 
         while (True):
             if (display_frame):
@@ -393,17 +404,25 @@ class ck_main(Frame):
                             for frm_idx in range(len(self.dp_pages[pg_idx])):
                                 self.dp_pages[pg_idx][frm_idx].destroy()
                         self.dp_pages.clear()
+                    if (gbl_lb_page):
+                        gbl_lb_page = ""
 
-                    page_cnt = range((len(data) // 4) + int(len(data) % 4 > 0)) # reset the page count
+                    # create list of pages
+                    self.page_cnt = (len(data) // 4) + int(len(data) % 4 > 0) # reset the page count
+                    if (self.page_cnt > 1):
+                        gbl_lb_page = f"1/{self.page_cnt}"
+                        self.lb_page_number.configure(text = gbl_lb_page)
+                    else:
+                        self.lb_page_number.configure(text = "")
                     frame_cnt = 0 # the total number of frames created
                     self.page_number = 0
-                    for page in page_cnt: # for each page
+                    for page in range(self.page_cnt): # for each page
                         page = []
                         for frame in range(4):
                             if (frame_cnt == len(data)):
                                 break # break if data for all frames are set
                             frm = dp_frame(self, data[frame_cnt][0], data[frame_cnt][1], 
-                                data[frame_cnt][2], data[frame_cnt][3])
+                                data[frame_cnt][2], data[frame_cnt][3]) # create the frame
                             page.append(frm) # add the frame to the page
                             frame_cnt += 1
                         self.dp_pages.append(page) # add 4 frames
@@ -431,6 +450,8 @@ class ck_main(Frame):
             self.page_number = len(self.dp_pages) - 1
         elif (self.page_number >= len(self.dp_pages)):
             self.page_number = 0
+        gbl_lb_page = f"{self.page_number + 1}/{self.page_cnt}"
+        self.lb_page_number.configure(text = gbl_lb_page)
         # hide the old page's frames
         for frm_idx in range(len(self.dp_pages[old_page])):
             self.dp_pages[old_page][frm_idx].place(x = GLOBAL_W + 1, y = 0, anchor = "nw")
