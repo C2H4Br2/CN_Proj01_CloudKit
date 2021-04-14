@@ -46,7 +46,8 @@ DB = "ck_database.db"
 DISCON_MSG = "!DISCONNECT" # disconnect message
 MSG_LG_TRUE = "!LG_TRUE" # login successful
 MSG_LG_FALSE = "!LG_FALSE" # login failed
-SUBMIT = "!SUBMIT"
+SUBMIT = "!SUBMIT" # request the data
+STILL_CONNECT = "!STILL_CONNECT" # check if the connection still exists
 
 # == SUPPORTING METHODS ======================================================================
 
@@ -94,7 +95,9 @@ if (db_exist == False):
     # default users
 df_users =  [
                 ('19127311', 'ohmygod', 1),
-                ('gulugulu', 'hoimo', 0)
+                ('gulugulu', 'iunhonholemo', 0),
+                ('19187019', 'nhonhonho', 1),
+                ('19127551', 'hihi', 1)
             ]
     # default cities
 df_cities = [
@@ -129,8 +132,8 @@ if (db_exist == False):
     cur.executemany("INSERT INTO tb_city VALUES (?, ?)", df_cities)
     cur.executemany("INSERT INTO tb_temp VALUES (?, ?, ?, ?)", df_temp)
 
-for city_idx in df_temp:
-    print(city_idx)
+#for city_idx in df_temp:
+#    print(city_idx)
 
 # commit all commands
 if (db_exist == False):
@@ -197,6 +200,7 @@ def tm_print(msg):
 server = None
 sv_active = False # server is active or not
 cl_list = [] # list of clients
+shutdown_all = False
 
 # start server
 def sv_start(): # server start
@@ -216,7 +220,7 @@ def sv_start(): # server start
     server.listen()
     tm_print(f"Server is listening on {SERVER}.")
     # create a thread for sv_find_client()
-    thread = threading.Thread(target = sv_find_client)
+    thread = threading.Thread(target = sv_find_client, daemon = True)
     thread.start()
 
 # check for client's connection
@@ -233,6 +237,14 @@ def sv_find_client():
 
 # handle client's login
 def sv_handle_login(conn, addr): # client's connection and address
+    global sv_active # enable edit for these variables
+    # check if the server is active
+    if (not sv_active):
+        sv_send_msg(MSG_LG_FALSE, conn)
+        sv_send_msg("0", conn)
+        return
+    
+    error_type = 1 # "Cannot connect to server."
     with sql.connect(DB) as con:
         # check if client's username exists
         cl_lgtype = int(sv_get_msg(conn)) # let the server know if the user's logging in or registering
@@ -254,10 +266,12 @@ def sv_handle_login(conn, addr): # client's connection and address
 
         if (cl_lgtype == 1): # 1: register
             if (not name_exist): # if username exists
-                t_cur.execute(f"INSERT INTO tb_user VALUES ('{cl_name}','{cl_pass}','{cl_usertype}')")
+                threading.Thread(target = lambda : t_cur.execute(f"INSERT INTO tb_user VALUES ('{cl_name}','{cl_pass}','{cl_usertype}')")).start()
+                #t_cur.execute(f"INSERT INTO tb_user VALUES ('{cl_name}','{cl_pass}','{cl_usertype}')")
                 sv_send_msg(MSG_LG_TRUE, conn)
                 sv_handle_client(conn, addr, cl_name)
                 return
+            error_type = 2 # "Username already exists."
         else: # 0: login
             if (name_exist): # if username exists
                 # check if password and usertype matches
@@ -270,9 +284,12 @@ def sv_handle_login(conn, addr): # client's connection and address
                     sv_send_msg(MSG_LG_TRUE, conn)
                     sv_handle_client(conn, addr, cl_name)
                     return
+                error_type = 3 # "Username or password is incorrect."
+            else:
+                error_type = 4 # "Username doesn't exist."
         # if all of the above fail
         sv_send_msg(MSG_LG_FALSE, conn)
-        sv_handle_login(conn, addr)
+        sv_send_msg(str(error_type), conn)
 
 # handle a single client
 def sv_handle_client(conn, addr, cl_name): # client's connection and address
@@ -285,15 +302,24 @@ def sv_handle_client(conn, addr, cl_name): # client's connection and address
     idx = sv_get_client(cl_list, cl_name) # get client's name via its index
     cl_name_show = f"[{cl_list[idx]}]"
 
+    lc_discon_msg = "Disconnected." # disconnect message used for this method only
+
     tm_print(f"{cl_name_show} Connected.")
     
     while (True): # wait for messages from the client
-        msg_len = conn.recv(HEADER).decode(FORMAT) # get the length of the message
+        if (not sv_active):
+            lc_discon_msg = "Disconnected due to server's shutdown."
+            break
+
+        msg_len = conn.recv(HEADER).decode(FORMAT)
         if (msg_len): # check if message is not null
             msg_len = int(msg_len) # convert it to integer
             msg = conn.recv(msg_len).decode(FORMAT) # get the message
 
             # handle types of messages
+                # check if server still connects
+            if (msg == STILL_CONNECT):
+                continue
                 # client disconnects
             if (msg == DISCON_MSG):
                 break
@@ -310,7 +336,7 @@ def sv_handle_client(conn, addr, cl_name): # client's connection and address
     del cl_list[idx] # remove client from list
 
     # close the connection
-    tm_print(f"{cl_name_show} Disconnected.")
+    tm_print(f"{cl_name_show} {lc_discon_msg}")
     conn.close()
 
 # send requested data to client
@@ -387,6 +413,8 @@ def sv_send_msg(a_msg, conn):
 # get message
 def sv_get_msg(conn):
     msg_len = conn.recv(HEADER).decode(FORMAT) # get the length of the message
+    if (not msg_len): # if the received message is empty
+        return ""   
     msg_len = int(msg_len) # convert it to integer
     msg = conn.recv(msg_len).decode(FORMAT) # get message
     return msg
@@ -402,22 +430,23 @@ def sv_get_client(cl_list, cl_name): # client list, client name
 
 # shut down the server
 def sv_stop():
-    global server, sv_active # enable edit on these variables
+    global server, sv_active, shutdown_all # enable edit on these variables
     btn_start.config(state = "normal") # enable start button
     btn_stop.config(state = "disable") # disable stop button
     # shut down and close the server
-    tm_print("Shutting down server...")
+    shutdown_all = True
     try:
         server.shutdown(socket.SHUT_RDWR)
-        sv_active = False
     except:
         pass
         #tm_print("Mission failed. We'll shut down the server next time.")
-    try:
-        server.close()
-    except:
-        pass
+    #try:
+    #    server.close()
+    #except:
+    #    pass
         #tm_print("Mission failed. We'll close the server next time.")
+    sv_active = False
+    tm_print("Server is shut down.")
 
 # == MAIN PROGRAM ============================================================================
 

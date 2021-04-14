@@ -46,7 +46,8 @@ FORMAT = 'utf-8' # encoding & decoding format
 DISCON_MSG = "!DISCONNECT" # disconnect message
 MSG_LG_TRUE = "!LG_TRUE" # login successful
 MSG_LG_FALSE = "!LG_FALSE" # login failed
-SUBMIT = "!SUBMIT"
+SUBMIT = "!SUBMIT" # request the data
+STILL_CONNECT = "!STILL_CONNECT" # check if the connection still exists
 
 # == VARIABLES ===============================================================================
 
@@ -57,10 +58,18 @@ login_type = 0 # 0 = login; 1 = register
 server = "" # server ip
 addr = () # server address
 username = ""; password = ""
+still_connect = False
 
 # Send & receiving
 submit = False
 sm_city = ""; sm_date = ""
+lg_error =  [
+                "Server is not active.",
+                "Cannot connect to server.",
+                "Username already exists.",
+                "Username or password is incorrect."
+                "Username doesn't exist."
+            ]
 
 # showing data
 data = []
@@ -136,29 +145,33 @@ class Ck(Tk):
 
     #   connect to the server
     def cl_connect(self, username):
-        global client, conn_status, addr, login_type, vid_start # enable edit for these variables
+        global client, conn_status, addr, login_type, vid_start, glb_lb_user, data, still_connect, lg_error # enable edit for these variables
         # create a socket for the client using (type: IPv4, mode: TCP)
-        try:
 
+        try:
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.connect(addr)
-
-            self.cl_send(f'{login_type}') # let server know if the user is logging in or registering
-            self.cl_send(username) # send username to the server
-            self.cl_send(password) # send password to the server
-            self.cl_send('1') # send usertype (admin/client) to the server
-            
-            lg_ok = (self.cl_get() == MSG_LG_TRUE) # check if login/register is successful
-            if (lg_ok):
-                self.show_frame("ck_main")
-                self.cl_main()
-            else:
-                if (login_type == 1):
-                    thread_mbox("WARNING!", "Registry unsuccessful.")  
-                else:
-                    thread_mbox("WARNING!", "Login unsuccessful.")
         except:
-            thread_mbox("WARNING!", "Mission failed. We'll connect next time.")
+            thread_mbox("WARNING!", f"Cannot connect to server.")
+            conn_status = False
+            return
+
+        self.cl_send(f'{login_type}') # let server know if the user is logging in or registering
+        self.cl_send(username) # send username to the server
+        self.cl_send(password) # send password to the server
+        self.cl_send('1') # send usertype (admin/client) to the server
+            
+        lg_ok = (self.cl_get() == MSG_LG_TRUE) # check if login/register is successful
+        if (lg_ok):
+            still_connect = True
+            self.show_frame("ck_main")
+            self.cl_main()
+        else:
+            error_type = int(self.cl_get()) # get
+            if (login_type == 1):
+                thread_mbox("WARNING!", f"Registry unsuccessful.\n{lg_error[error_type]}")  
+            else:
+                thread_mbox("WARNING!", f"Login unsuccessful.\n{lg_error[error_type]}")
         
         # disconnect
         conn_status = False
@@ -175,19 +188,27 @@ class Ck(Tk):
     #   receive messages
     def cl_get(self):
         msg_len = client.recv(HEADER).decode(FORMAT) # get the length of the message
+        if (not msg_len):
+            return ""
         msg_len = int(msg_len) # convert it to integer
         msg = client.recv(msg_len).decode(FORMAT) # get message
         return msg
 
     #    main method
     def cl_main(self):
-        global trg_logout, client, data, submit, display_frame, gbl_lb_user # enable edit for these variables
+        global trg_logout, client, data, submit, display_frame, gbl_lb_user, still_connect # enable edit for these variables
 
         # create a new display label for username
         gbl_lb_user = Label(self, text = username, font = FNT_MAIN, bg = COL_BG)
         gbl_lb_user.place(x = 650, y = 74 / 2, anchor = "e")
         # while connected to the server
         while (True):
+            # check if the server still connects
+            try:
+                self.cl_send(STILL_CONNECT)
+            except:
+                still_connect = False
+                break
 
             # check if client requests data
             if (submit):
@@ -210,8 +231,8 @@ class Ck(Tk):
                     data.append(feats) # add (city, date) to data[]
                     #print(feats) # for testing only
 
-                for city in data:
-                    print(city)
+                #for city in data:
+                #    print(city)
 
                 display_frame = True
                 #print("hoi mò")
@@ -222,7 +243,17 @@ class Ck(Tk):
 
         trg_logout = False
         self.show_frame("ck_login")
-        self.cl_send(DISCON_MSG)
+        if (still_connect): # if the client logs out successfully
+            self.cl_send(DISCON_MSG)
+            still_connect = False
+        else: # if the server suddenly shuts down
+            gbl_lb_user.destroy()
+            thread_mbox("WARNING!", "Connection is lost.")
+            # destroy display data should it exists
+            if (data):
+                self.rm_main_display_clear()
+                self.lb_page_number.configure(text = "")
+                data.clear()
 
 # == GUI: LOGIN WINDOW =======================================================================
 
@@ -364,11 +395,7 @@ class ck_main(Frame):
     def rm_main_logout(self):
         global trg_logout, data, gbl_lb_user # enable edit for these variables
         trg_logout = True
-        if (self.dp_pages):
-            for pg_idx in range(len(self.dp_pages)):
-                for frm_idx in range(len(self.dp_pages[pg_idx])):
-                    self.dp_pages[pg_idx][frm_idx].destroy()
-            self.dp_pages.clear()
+        self.rm_main_display_clear()
         data.clear()
         gbl_lb_user.destroy()
         self.lb_page_number.configure(text = "")
@@ -399,13 +426,7 @@ class ck_main(Frame):
                 # get data
                 if (data):
                     # clear the list of pages
-                    if (self.dp_pages):
-                        for pg_idx in range(len(self.dp_pages)):
-                            for frm_idx in range(len(self.dp_pages[pg_idx])):
-                                self.dp_pages[pg_idx][frm_idx].destroy()
-                        self.dp_pages.clear()
-                    if (gbl_lb_page):
-                        gbl_lb_page = ""
+                    self.rm_main_display_clear()
 
                     # create list of pages
                     self.page_cnt = (len(data) // 4) + int(len(data) % 4 > 0) # reset the page count
@@ -450,6 +471,7 @@ class ck_main(Frame):
             self.page_number = len(self.dp_pages) - 1
         elif (self.page_number >= len(self.dp_pages)):
             self.page_number = 0
+        # page display configuration
         gbl_lb_page = f"{self.page_number + 1}/{self.page_cnt}"
         self.lb_page_number.configure(text = gbl_lb_page)
         # hide the old page's frames
@@ -458,6 +480,16 @@ class ck_main(Frame):
         # display the new page's frames
         for frm_idx in range(len(self.dp_pages[self.page_number])):
             self.dp_pages[self.page_number][frm_idx].place(x = 34, y = 140 + frm_idx * 102, anchor = "nw")
+
+    def rm_main_display_clear(self):
+        global gbl_lb_page # enable edit for these variables
+        if (self.dp_pages):
+            for pg_idx in range(len(self.dp_pages)):
+                for frm_idx in range(len(self.dp_pages[pg_idx])):
+                    self.dp_pages[pg_idx][frm_idx].destroy()
+            self.dp_pages.clear()
+        if (gbl_lb_page):
+            gbl_lb_page = ""
 
 # == GUI: MAIN WINDOW - DISPLAY FRAME ========================================================
 
