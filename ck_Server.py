@@ -10,7 +10,7 @@ import datetime # get time for each log in terminal
 from datetime import date # get current date
 
 # SQL
-import sqlite3 as sql
+import pyodbc
 import os.path # check for database's existence
 import random # create random data
 
@@ -40,7 +40,8 @@ ADDR = (SERVER, PORT) # address
 FORMAT = 'utf-8' # encoding & decoding format
 
 # Database
-DB = "ck_database.db"
+DB_SERVER = "DESKTOP-DRF79SM\\TRTHTN"
+DB = "DB_CLOUDKIT"
 
 # Messages
 DISCON_MSG = "!DISCONNECT" # disconnect message
@@ -57,65 +58,86 @@ def curtime(): # current time
 
 # == DATABASE INITIALIZATION==================================================================
 
-SQLITE_THREADSAFE = 2
+db_conn = None; db_cur = None
+try: # connect to the already existing database
 
-# check if the database is already created
-db_exist = os.path.isfile(DB)
+    db_conn = pyodbc.connect('Driver={SQL Server};'
+                            f'Server={DB_SERVER};'
+                            f'Database={DB};'
+                            'Trusted_Connection=yes;')
+    print("Database exists.")
+    db_conn.autocommit = True 
+    db_cur = db_conn.cursor() # create cursor for committing
+    db_cur.execute(f"USE {DB}")
 
-# connect to the database (or create a new one if none exists)
-db_conn = sql.connect(DB)
+except: # if the database doesn't exist, create it
+    
+    #try: 
+    db_conn = pyodbc.connect('Driver={SQL Server};'
+                            f'Server={DB_SERVER};'
+                            'Trusted_Connection=yes;')
+    print("Database doesn't exist.")
+    db_conn.autocommit = True
+    db_cur = db_conn.cursor() # create cursor for committing
+    db_cur.execute(f"CREATE DATABASE {DB}")
+    db_cur.execute(f"USE {DB}")
 
-# create a cursor which is used to execute SQL commands
-cur = db_conn.cursor()
+    # create tables & primary keys
+        # user table
+    db_cur.execute( """ CREATE TABLE TB_USER
+                        (
+                            userName varchar(30),
+                            userPass varchar(30),
+                            userType smallint,
+                            PRIMARY KEY (userName)
+                        )
+                        """)
+        # city table
+    db_cur.execute( """ CREATE TABLE TB_CITY
+                        (
+                            cityID char(3),
+                            cityName varchar(50),
+                            PRIMARY KEY (cityID)
+                        )
+                        """)
+        # date table
+    db_cur.execute( """ CREATE TABLE TB_DATE
+                        (
+                            cityID char(3),
+                            dateDate date,
+                            dateTemp smallint,
+                            dateStat varchar(20),
+                            PRIMARY KEY (cityID, dateDate)
+                        )
+                        """)
+    
+    # create foreign keys & other constraints
+        # unique: cityName
+    db_cur.execute( """ ALTER TABLE TB_CITY
+                        ADD UNIQUE (cityName)
+                        """)
+        # foreign: cityID
+    db_cur.execute( """ ALTER TABLE TB_DATE
+                        ADD FOREIGN KEY (cityID) REFERENCES TB_CITY(cityID)
+                        """)
 
-# create tables
-if (db_exist == False):
-    # users & admins
-    cur.execute("""CREATE TABLE tb_user (
-        username TEXT,
-        password TEXT,
-        usertype INTEGER
-    )""")
-
-    # city
-    cur.execute("""CREATE TABLE tb_city(
-        id TEXT,
-        name TEXT
-    )""")
-
-    # temperature (celcius, according to date)
-    cur.execute("""CREATE TABLE tb_temp(
-        id TEXT,
-        date TEXT,
-        temp INTEGER,
-        status TEXT
-    )""")
-
-# insert data
-    # default users
-df_users =  [
-                ('19127311', 'ohmygod', 1),
-                ('gulugulu', 'iunhonholemo', 0),
-                ('19187019', 'nhonhonho', 1),
-                ('19127551', 'duataydaynao', 1)
-            ]
-    # default cities
-df_cities = [
-                ('SGN', 'Ho Chi Minh City'),
-                ('HAN', 'Ha Noi'),
-                ('DLT', 'Da Lat')
-            ]
-    # default temperatures
-'''
-df_temp =   [
-                ('SGN', '2021-04-05', 35, 'Sunny'),
-                ('SGN', '2021-04-06', 31, 'Cloudy'),
-                ('SGN', '2021-04-07', 25, 'Rainy')
-            ]
-'''
-df_stat = ['Sunny', 'Cloudy', 'Rainy', 'Foggy']
-df_temp = []
-if (not db_exist):
+    # default data
+        # default users
+    df_users =  [
+                    ('19127311', 'hoimo', 1),
+                    ('19187019', 'hokshououmo', 1),
+                    ('gulugulu', 'iunhonholemo', 0),
+                    ('nhonho', 'iugulugululemo', 0)
+                ]
+        # default cities
+    df_cities = [
+                    ('SGN', 'Ho Chi Minh City'),
+                    ('HAN', 'Hanoi'),
+                    ('DLT', 'Da Lat')
+                ]
+        # default status
+    df_stat = ['Sunny', 'Cloudy', 'Rainy', 'Foggy']
+    df_temp = []
     cur_month = date.today().strftime("20" + "%y-%m-")
     cur_date = date.today()
     for city_idx in df_cities:
@@ -126,18 +148,13 @@ if (not db_exist):
             df_temp_dt.append(f'{random.randint(20, 38)}') 
             df_temp_dt.append(f'{df_stat[random.randint(0, 3)]}')
             df_temp.append(df_temp_dt)
-    # insert the default data if database is not created before
-if (db_exist == False):
-    cur.executemany("INSERT INTO tb_user VALUES (?, ?, ?)", df_users)
-    cur.executemany("INSERT INTO tb_city VALUES (?, ?)", df_cities)
-    cur.executemany("INSERT INTO tb_temp VALUES (?, ?, ?, ?)", df_temp)
-
-#for city_idx in df_temp:
-#    print(city_idx)
-
-# commit all commands
-if (db_exist == False):
-    db_conn.commit()
+    
+    # insert data
+    db_cur.executemany("INSERT INTO TB_USER VALUES (?, ?, ?)", df_users)
+    db_cur.executemany("INSERT INTO TB_CITY VALUES (?, ?)", df_cities)
+    db_cur.executemany("INSERT INTO TB_DATE VALUES (?, ?, ?, ?)", df_temp)
+    #except:
+    #    print("Failed.")
 
 # == SETUP: GUI ==============================================================================
 
