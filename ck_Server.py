@@ -97,7 +97,7 @@ df_users =  [
                 ('19127311', 'ohmygod', 1),
                 ('gulugulu', 'iunhonholemo', 0),
                 ('19187019', 'nhonhonho', 1),
-                ('19127551', 'hihi', 1)
+                ('19127551', 'duataydaynao', 1)
             ]
     # default cities
 df_cities = [
@@ -251,6 +251,7 @@ def sv_handle_login(conn, addr): # client's connection and address
         cl_name = sv_get_msg(conn) # get username
         cl_pass = sv_get_msg(conn) # get password
         cl_usertype = int(sv_get_msg(conn)) # get usertype (admin/client)
+        cl_usertype_name = "ADMIN" if cl_usertype == 0 else "CLIENT"
 
         t_cur = con.cursor() # create new db cursor for the thread
 
@@ -269,7 +270,7 @@ def sv_handle_login(conn, addr): # client's connection and address
                 threading.Thread(target = lambda : t_cur.execute(f"INSERT INTO tb_user VALUES ('{cl_name}','{cl_pass}','{cl_usertype}')")).start()
                 #t_cur.execute(f"INSERT INTO tb_user VALUES ('{cl_name}','{cl_pass}','{cl_usertype}')")
                 sv_send_msg(MSG_LG_TRUE, conn)
-                sv_handle_client(conn, addr, cl_name)
+                sv_handle_client(conn, addr, cl_name, cl_usertype_name)
                 return
             error_type = 2 # "Username already exists."
         else: # 0: login
@@ -282,7 +283,7 @@ def sv_handle_login(conn, addr): # client's connection and address
                 
                 if (cur_type == cl_usertype and cur_pass == cl_pass): # check if the user is client
                     sv_send_msg(MSG_LG_TRUE, conn)
-                    sv_handle_client(conn, addr, cl_name)
+                    sv_handle_client(conn, addr, cl_name, cl_usertype_name)
                     return
                 error_type = 3 # "Username or password is incorrect."
             else:
@@ -292,7 +293,7 @@ def sv_handle_login(conn, addr): # client's connection and address
         sv_send_msg(str(error_type), conn)
 
 # handle a single client
-def sv_handle_client(conn, addr, cl_name): # client's connection and address
+def sv_handle_client(conn, addr, cl_name, cl_usertype): # client's connection and address
     global cl_list # enable edit for these variables
     
     # for submitting
@@ -300,7 +301,7 @@ def sv_handle_client(conn, addr, cl_name): # client's connection and address
 
     cl_list.append(cl_name) # add client to list
     idx = sv_get_client(cl_list, cl_name) # get client's name via its index
-    cl_name_show = f"[{cl_list[idx]}]"
+    cl_name_show = f"[{cl_usertype}/{cl_list[idx]}]"
 
     lc_discon_msg = "Disconnected." # disconnect message used for this method only
 
