@@ -254,7 +254,7 @@ def sv_find_client():
 
 # handle client's login
 def sv_handle_login(conn, addr): # client's connection and address
-    global sv_active # enable edit for these variables
+    global sv_active, db_conn, db_cur # enable edit for these variables
     # check if the server is active
     if (not sv_active):
         sv_send_msg(MSG_LG_FALSE, conn)
@@ -262,49 +262,47 @@ def sv_handle_login(conn, addr): # client's connection and address
         return
     
     error_type = 1 # "Cannot connect to server."
-    with sql.connect(DB) as con:
-        # check if client's username exists
-        cl_lgtype = int(sv_get_msg(conn)) # let the server know if the user's logging in or registering
-        cl_name = sv_get_msg(conn) # get username
-        cl_pass = sv_get_msg(conn) # get password
-        cl_usertype = int(sv_get_msg(conn)) # get usertype (admin/client)
-        cl_usertype_name = "ADMIN" if cl_usertype == 0 else "CLIENT"
+    
+    # check if client's username exists
+    cl_lgtype = int(sv_get_msg(conn)) # let the server know if the user's logging in or registering
+    cl_name = sv_get_msg(conn) # get username
+    cl_pass = sv_get_msg(conn) # get password
+    cl_usertype = int(sv_get_msg(conn)) # get usertype (admin/client)
+    cl_usertype_name = "ADMIN" if cl_usertype == 0 else "CLIENT"
 
-        t_cur = con.cursor() # create new db cursor for the thread
+    # check if the username already exists
+        # get the number of cl_name
+    db_cur.execute(f""" SELECT COUNT(*)
+                        FROM TB_USER
+                        WHERE userName = '{cl_name}'
+                        GROUP BY userName""")
+    cur_count_arr = db_cur.fetchone() # get the result string
+    cur_count = cur_count_arr[0] # get the count from the string
+    name_exist = (cur_count > 0)
 
-        # check if the username already exists
-            # get the number of cl_name
-        t_cur.execute(f"""SELECT COUNT(*) 
-                        FROM (SELECT username 
-                                FROM tb_user 
-                                WHERE username = '{cl_name}')""")
-        cur_count_arr = t_cur.fetchone() # get the result string
-        cur_count = cur_count_arr[0] # get the count from the string
-        name_exist = (cur_count > 0)
-
-        if (cl_lgtype == 1): # 1: register
-            if (not name_exist): # if username exists
-                threading.Thread(target = lambda : t_cur.execute(f"INSERT INTO tb_user VALUES ('{cl_name}','{cl_pass}','{cl_usertype}')")).start()
-                #t_cur.execute(f"INSERT INTO tb_user VALUES ('{cl_name}','{cl_pass}','{cl_usertype}')")
+    if (cl_lgtype == 1): # 1: register
+        if (not name_exist): # if username exists
+            threading.Thread(target = lambda : db_cur.execute(f"INSERT INTO TB_USER VALUES ('{cl_name}','{cl_pass}','{cl_usertype}')")).start()
+            sv_send_msg(MSG_LG_TRUE, conn)
+            sv_handle_client(conn, addr, cl_name, cl_usertype_name)
+            return
+        error_type = 2 # "Username already exists."
+    else: # 0: login
+        if (name_exist): # if username exists
+            # check if password and usertype matches
+            db_cur.execute(f"SELECT userPass, userType FROM TB_USER WHERE userName = '{cl_name}'")
+            cur_result = db_cur.fetchone() # get query
+            cur_pass = cur_result[0] # get password
+            cur_type = cur_result[1] # get usertype
+            
+            if (cur_type == cl_usertype and cur_pass == cl_pass): # check if the user is client
                 sv_send_msg(MSG_LG_TRUE, conn)
                 sv_handle_client(conn, addr, cl_name, cl_usertype_name)
                 return
-            error_type = 2 # "Username already exists."
-        else: # 0: login
-            if (name_exist): # if username exists
-                # check if password and usertype matches
-                t_cur.execute(f"SELECT password, usertype FROM tb_user WHERE username = '{cl_name}'")
-                cur_result = t_cur.fetchone() # get query
-                cur_pass = cur_result[0] # get password
-                cur_type = cur_result[1] # get usertype
-                
-                if (cur_type == cl_usertype and cur_pass == cl_pass): # check if the user is client
-                    sv_send_msg(MSG_LG_TRUE, conn)
-                    sv_handle_client(conn, addr, cl_name, cl_usertype_name)
-                    return
-                error_type = 3 # "Username or password is incorrect."
-            else:
-                error_type = 4 # "Username doesn't exist."
+            error_type = 3 # "Username or password is incorrect."
+        else:
+            error_type = 4 # "Username doesn't exist."
+
         # if all of the above fail
         sv_send_msg(MSG_LG_FALSE, conn)
         sv_send_msg(str(error_type), conn)
@@ -359,6 +357,9 @@ def sv_handle_client(conn, addr, cl_name, cl_usertype): # client's connection an
 
 # send requested data to client
 def sv_handle_client_send_data(conn, cl_name):
+    global db_conn, db_cur # enable edits for these variables
+    cur_date = "20" + date.today().strftime("%y-%m-%d") # current date
+
     # get request info
     tm_print(f"{cl_name} Requesting data...")
     # get the info
@@ -366,59 +367,55 @@ def sv_handle_client_send_data(conn, cl_name):
     sm_date = sv_get_msg(conn) # get date
     # change info's type
     print_city = sm_city if sm_city != "!BLANK_CITY" else "All"
-    print_date = sm_date if sm_date != "!BLANK_DATE" else "20" + date.today().strftime("%y-%m-%d")
-    if (print_city != "All"):
+    print_date = sm_date if sm_date != "!BLANK_DATE" else cur_date
+    if (print_city != "All" and print_date == cur_date):
         print_date = "Last 7 days"
     # print the requested info
     tm_print(f"{cl_name} Requested City ID: {print_city}.")
     tm_print(f"{cl_name} Requested Date: {print_date}.")
 
-    with sql.connect(DB) as con:
-        t_cur = con.cursor() # create new db cursor to the thread
+    # constructing the WHERE clause
+    #tm_print(f"{cl_name} Establishing query...")
+        # WHERE sub-clauses
+    where_city = f"c.cityId = '{sm_city}'" if sm_city != "!BLANK_CITY" else "" # city
+    where_date = f"d.dateDate = '{sm_date}'" # date
+    where_head = "WHERE" # WHERE
+    where_and  = "AND" if sm_city != "!BLANK_CITY" else "" # AND
+        # Sub-clauses edit
+    if (sm_date == "!BLANK_DATE"):
+        if (sm_city == "!BLANK_CITY"): # if city entry is also blank
+            where_date = f"d.dateDate = '{cur_date}'" # get current date
+        else: # if city entry is not blank (duh)
+            where_date = f"d.dateDATE BETWEEN DATEADD(DAY, -7, GETDATE()) AND GETDATE()" # get the last 7 days
+        # full clause
+    where_full = f"{where_head} {where_city} {where_and} {where_date}"
 
-        # constructing the WHERE clause
-        #tm_print(f"{cl_name} Establishing query...")
-            # WHERE sub-clauses
-        where_city = f"c.id = '{sm_city}'" if sm_city != "!BLANK_CITY" else "" # city
-        where_date = f"t.date = '{sm_date}'" # date
-        where_head = "WHERE" # WHERE
-        where_and  = "AND" if sm_city != "!BLANK_CITY" else "" # AND
-            # Sub-clauses edit
-        if (sm_date == "!BLANK_DATE"):
-            if (sm_city == "!BLANK_CITY"): # if city entry is also blank
-                cur_date = "20" + date.today().strftime("%y-%m-%d")
-                where_date = f"t.date = '{cur_date}'" # get current date
-            else: # if city entry is not blank (duh)
-                where_date = f"DATE(t.date) >= DATE(t.date, '-7 day')" # get the last 7 days
-            # full clause
-        where_full = f"{where_head} {where_city} {where_and} {where_date}"
+    #tm_print(f"{cl_name} Running query...")
+    # get the count of the cities requested
+    # the client needs this count to know how many cities to receive
+    db_cur.execute(f""" SELECT COUNT(*)
+                        FROM TB_CITY c JOIN TB_DATE d ON c.cityId = d.cityId 
+                        {where_full}
+                    """)
+    city_count = db_cur.fetchone()[0] # get the count
+    sv_send_msg(str(city_count), conn) # send it
 
-        #tm_print(f"{cl_name} Running query...")
-        # get the count of the cities requested
-        # the client needs this count to know how many cities to receive
-        t_cur.execute(f"""  SELECT COUNT(*)
-                            FROM tb_city c JOIN tb_temp t ON c.id = t.id 
-                            {where_full}
-                        """)
-        city_count = t_cur.fetchone()[0] # get the count
-        sv_send_msg(str(city_count), conn) # send it
+    # result: (c.id, c.name, d.id, d.date, d.temp, d.status, )
+    db_cur.execute(f""" SELECT c.*, d.*
+                        FROM TB_CITY c JOIN TB_DATE d ON c.cityId = d.cityId
+                        {where_full}
+                    """)
+    rows = db_cur.fetchall() # get the result query
 
-        # result: (c.id, c.name, t.id, t.date, t.temp, t.status, )
-        t_cur.execute(f"""  SELECT c.*, t.*
-                            FROM tb_city c JOIN tb_temp t ON c.id = t.id
-                            {where_full}
-                        """)
-        rows = t_cur.fetchall() # get the result query
+    #tm_print(f"{cl_name} Sending requested data...")
+    # send the info to the client
+    for row in rows:
+        sv_send_msg(row[1], conn) # city name
+        sv_send_msg(row[3], conn) # date in question
+        sv_send_msg(str(row[4]), conn) # temperature
+        sv_send_msg(row[5], conn) # status
 
-        #tm_print(f"{cl_name} Sending requested data...")
-        # send the info to the client
-        for row in rows:
-            sv_send_msg(row[1], conn) # city name
-            sv_send_msg(row[3], conn) # date in question
-            sv_send_msg(str(row[4]), conn) # temperature
-            sv_send_msg(row[5], conn) # status
-
-        tm_print(f"{cl_name} Requested data sent to client.")
+    tm_print(f"{cl_name} Requested data sent to client.")
 
 def sv_send_msg(a_msg, conn):
     msg = a_msg.encode(FORMAT) # encode the message

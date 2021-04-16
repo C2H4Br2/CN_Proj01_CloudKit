@@ -251,8 +251,8 @@ class Ck(Tk):
             thread_mbox("WARNING!", "Connection is lost.")
             # destroy display data should it exists
             if (data):
-                self.rm_main_display_clear()
-                self.lb_page_number.configure(text = "")
+                self.frames["ck_main"].rm_main_display_clear()
+                self.frames["ck_main"].lb_page_number.configure(text = "")
                 data.clear()
 
 # == GUI: LOGIN WINDOW =======================================================================
