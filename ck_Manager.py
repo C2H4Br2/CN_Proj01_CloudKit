@@ -1,4 +1,4 @@
-# Client application
+# Admin application
 
 # == IMPORTS =================================================================================
 
@@ -47,7 +47,13 @@ FORMAT = 'utf-8' # encoding & decoding format
 DISCON_MSG = "!DISCONNECT" # disconnect message
 MSG_LG_TRUE = "!LG_TRUE" # login successful
 MSG_LG_FALSE = "!LG_FALSE" # login failed
-SUBMIT = "!SUBMIT" # request the data
+SUBMIT = "!SUBMIT" # submit the data
+SM_EC = "!SUBMIT_EDITCITY" # submit city data
+SM_ED = "!SUBMIT_EDITDATE" # submit date data
+SM_EC_1 = "!SUBMIT_EDITCITY_1" # for checking city's edit
+SM_EC_2 = "!SUBMIT_EDITCITY_2" # for checking city's addition
+SM_ED_1 = "!SUBMIT_EDITDATE_1" # for checking date's edit
+SM_ED_2 = "!SUBMIT_EDITDATE_2" # for checking date's addition
 STILL_CONNECT = "!STILL_CONNECT" # check if the connection still exists
 
 # == VARIABLES ===============================================================================
@@ -63,7 +69,7 @@ still_connect = False
 
 # Send & receiving
 submit = False
-sm_city = ""; sm_date = ""
+sm_cityID = ""; sm_cityName = ""
 lg_error =  [
                 "Server is not active.",
                 "Cannot connect to server.",
@@ -207,6 +213,22 @@ class Ck(Tk):
             except:
                 still_connect = False
                 break
+
+            # check if admin add or edit something
+            if (submit):
+                self.cl_send(SUBMIT)
+                self.cl_send(SM_EC)
+                self.cl_send(sm_cityId)
+                self.cl_send(sm_cityName)
+                submit = False
+
+                # get the notification
+                noti = ""
+                if (self.cl_get() == SM_EC_1):
+                    noti = "City already exists and has been updated."
+                else:
+                    noti = "City has been added to the database."
+                thread_mbox("NOTIFICATION", noti)
 
             # check for disconnection
             if (trg_logout):
@@ -371,7 +393,6 @@ class ck_main(Frame):
         global trg_logout, gbl_lb_user # enable edit for these variables
         gbl_lb_user.destroy()
         trg_logout = True
-        self.frames["ck_main_editCity"].tkraise()
 
 # == GUI: MAIN FRAME - EDIT CITY =============================================================
 
@@ -401,7 +422,7 @@ class ck_main_editCity(Frame):
             selectbackground = COL_GRAY, relief = FLAT) # city name
             # buttons
         self.btn_submit = Button(self, image = self.img_btn_submit, borderwidth = 0, bg = COL_BG,
-            activebackground = COL_BG, command = lambda : self.rm_main_submit()) # submit button
+            activebackground = COL_BG, command = lambda : self.rm_main_editCity_submit()) # submit button
 
         # widgets positioning
             # constant variables
@@ -421,6 +442,24 @@ class ck_main_editCity(Frame):
         self.en_name.place(x = entry_x + 20, y = entry_y + entry_h * 2, anchor = "w")
             # buttons
         self.btn_submit.place(x = CEN_X, y = entry_y + entry_h * 3, anchor = "n")
+
+    # submit city
+    def rm_main_editCity_submit(self):
+        global submit, sm_cityId, sm_cityName # enable edit for these variables
+        # get info from input fields
+        sm_cityId = self.en_id.get()
+        sm_cityName = self.en_name.get()
+
+        # check for invalid input
+        if (not sm_cityId or not sm_cityName): # blank input
+            thread_mbox("WARNING!", "Blank input is not allowed!")
+            return 
+        elif (len(sm_cityId) != 3): # invalid city ID
+            thread_mbox("WARNING!", "City ID's length must be 3!")
+            return
+        
+        # submit
+        submit = True
 
 # == GUI: MAIN FRAME - EDIT DATE =============================================================
 
@@ -458,7 +497,7 @@ class ck_main_editDate(Frame):
             selectbackground = COL_GRAY, relief = FLAT) # status
             # buttons
         self.btn_submit = Button(self, image = self.img_btn_submit, borderwidth = 0, bg = COL_BG,
-            activebackground = COL_BG, command = lambda : self.rm_main_submit()) # submit button
+            activebackground = COL_BG, command = lambda : self.rm_main_editDate_submit()) # submit button
 
         # widgets positioning
             # constant variables

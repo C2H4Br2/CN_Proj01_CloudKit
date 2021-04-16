@@ -48,6 +48,12 @@ DISCON_MSG = "!DISCONNECT" # disconnect message
 MSG_LG_TRUE = "!LG_TRUE" # login successful
 MSG_LG_FALSE = "!LG_FALSE" # login failed
 SUBMIT = "!SUBMIT" # request the data
+SM_EC = "!SUBMIT_EDITCITY" # submit city data
+SM_ED = "!SUBMIT_EDITDATE" # submit date data
+SM_EC_1 = "!SUBMIT_EDITCITY_1" # for checking city's edit
+SM_EC_2 = "!SUBMIT_EDITCITY_2" # for checking city's addition
+SM_ED_1 = "!SUBMIT_EDITDATE_1" # for checking date's edit
+SM_ED_2 = "!SUBMIT_EDITDATE_2" # for checking date's addition
 STILL_CONNECT = "!STILL_CONNECT" # check if the connection still exists
 
 # == SUPPORTING METHODS ======================================================================
@@ -310,9 +316,6 @@ def sv_handle_login(conn, addr): # client's connection and address
 # handle a single client
 def sv_handle_client(conn, addr, cl_name, cl_usertype): # client's connection and address
     global cl_list # enable edit for these variables
-    
-    # for submitting
-    sm_city = ""; sm_date = ""
 
     cl_list.append(cl_name) # add client to list
     idx = sv_get_client(cl_list, cl_name) # get client's name via its index
@@ -341,8 +344,11 @@ def sv_handle_client(conn, addr, cl_name, cl_usertype): # client's connection an
                 break
                 # client requests information
             if (msg == SUBMIT):
-                    sv_handle_client_send_data(conn, cl_name_show)
-                    continue
+                if (cl_usertype == "CLIENT"):
+                    sv_handle_client_send_data_client(conn, cl_name_show)
+                else:
+                    sv_handle_client_send_data_admin(conn, cl_name_show)
+                continue
             
             tm_print(f"{cl_name_show} {msg}")
     
@@ -356,10 +362,10 @@ def sv_handle_client(conn, addr, cl_name, cl_usertype): # client's connection an
     conn.close()
 
 # send requested data to client
-def sv_handle_client_send_data(conn, cl_name):
+def sv_handle_client_send_data_client(conn, cl_name):
     global db_conn, db_cur # enable edits for these variables
     cur_date = "20" + date.today().strftime("%y-%m-%d") # current date
-
+    
     # get request info
     tm_print(f"{cl_name} Requesting data...")
     # get the info
@@ -416,6 +422,38 @@ def sv_handle_client_send_data(conn, cl_name):
         sv_send_msg(row[5], conn) # status
 
     tm_print(f"{cl_name} Requested data sent to client.")
+
+# send requested data to admin
+def sv_handle_client_send_data_admin(conn, cl_name):
+    global db_conn, db_cur # enable edits for these variables
+    cur_date = "20" + date.today().strftime("%y-%m-%d") # current date
+
+    # get request info
+    tm_print(f"{cl_name} Submitting data...")
+    # check for the type of submission
+    sm_type = sv_get_msg(conn) # SM_EC: city; SM_ED: date
+    # get the data according to the type
+    if (sm_type == SM_EC):
+        sm_cityId = sv_get_msg(conn) # city id
+        sm_cityName = sv_get_msg(conn) # city name
+        tm_print(f"{cl_name} Submitted City ID: {sm_cityId}")
+        tm_print(f"{cl_name} Submitted City Name: {sm_cityName}")
+        
+        # check for the city's existence
+        db_cur.execute(f""" SELECT COUNT(*)
+                            FROM TB_CITY
+                            WHERE cityId = '{sm_cityId}'
+                        """)
+        city_count = db_cur.fetchone()[0] # get the count
+        if (city_count != 0): # if the city exists, update it
+            tm_print(f"{cl_name} City already exists. It will be updated instead.")
+            db_cur.execute(f"UPDATE TB_CITY SET cityName = '{sm_cityName}' WHERE cityId = '{sm_cityId}'")
+            sv_send_msg(SM_EC_1, conn)
+            tm_print(f"{cl_name} City updated.")
+        else: # if it doesn't, add it to the database
+            db_cur.execute(f"INSERT INTO TB_CITY VALUES ('{sm_cityId}', '{sm_cityName}')")
+            sv_send_msg(SM_EC_2, conn)
+            tm_print(f"{cl_name} City added.")
 
 def sv_send_msg(a_msg, conn):
     msg = a_msg.encode(FORMAT) # encode the message
