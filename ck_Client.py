@@ -31,6 +31,7 @@ CEN_X = GLOBAL_W / 2; CEN_Y = GLOBAL_H / 2
 WIN_OFFSETX = 280; WIN_OFFSETY = 142
     # font
 FNT_MAIN = ("Quicksand Bold", 12)
+FNT_SMOL = ("Quicksand Bold", 10)
 FNT_DP = ("Quicksand Bold", 20)
 FNT_DP_SMOL = ("Quicksand Medium", 14)
 
@@ -274,6 +275,9 @@ class ck_login(Frame):
         # widgets
             # Logo
         self.lb_logo = Label(self, image = self.img_logo, bg = COL_BG)
+            # credits
+        self.lb_credit = Label(self, text = "Developed by Tran Thanh Tung - 19127311 and Huynh Thu Thao - 19127551",
+            font = FNT_SMOL, bg = COL_BG, fg = COL_GRAY)
             # Dummy input fields
         self.lb_en_user = Label(self, image = self.img_entry, bg = COL_BG) # username dummy input field
         self.lb_en_pass = Label(self, image = self.img_entry, bg = COL_BG) # password dummy input field
@@ -298,6 +302,8 @@ class ck_login(Frame):
         # widgets positioning
             # logo
         self.lb_logo.place(x = CEN_X, y = CEN_Y - 128, anchor = "center")
+            # credits
+        self.lb_credit.place(x = CEN_X, y = GLOBAL_H  - 12, anchor = "s")
             # username & password
         user_offy = 8; pass_offy = user_offy + 52; ip_offy = pass_offy + 52 # vertical offset for username and password
         lb_en_offx = 116; lb_offx = 160; en_offx = 96 # horizontal offset for input fields
