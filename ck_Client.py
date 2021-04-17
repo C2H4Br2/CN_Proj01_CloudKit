@@ -542,7 +542,7 @@ class ck_welcome(Tk):
         self.overrideredirect(1)
 
         # prepare video
-        self.vid_src = SRC + "ck_welcome.mp4" # video's path
+        self.vid_src = "Resources/ck_welcome.mp4" # video's path
         self.lb_vid = Label(self)
         self.lb_vid.pack() # set video's label
         self.vid = tkvideo(self.vid_src, self.lb_vid, loop = 0, size = (800, 600))
@@ -555,8 +555,8 @@ class ck_welcome(Tk):
 
 # == MAIN PROGRAM ============================================================================
 
-#welcome = ck_welcome()
-#welcome.mainloop()
+welcome = ck_welcome()
+welcome.mainloop()
 
 app = Ck()
 app.mainloop()

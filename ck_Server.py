@@ -50,6 +50,7 @@ MSG_LG_FALSE = "!LG_FALSE" # login failed
 SUBMIT = "!SUBMIT" # request the data
 SM_EC = "!SUBMIT_EDITCITY" # submit city data
 SM_ED = "!SUBMIT_EDITDATE" # submit date data
+SM_EC_0 = "!SUBMIT_EDITCITY_0" # city doesn't exist
 SM_EC_1 = "!SUBMIT_EDITCITY_1" # for checking city's edit
 SM_EC_2 = "!SUBMIT_EDITCITY_2" # for checking city's addition
 SM_ED_1 = "!SUBMIT_EDITDATE_1" # for checking date's edit
@@ -166,7 +167,7 @@ except: # if the database doesn't exist, create it
 
 # initialization
 ck = Tk() # Create GUI window
-ck.title('Cloud Kit Weather Forecast') # Set title
+ck.title('Cloud Kit Server Terminal') # Set title
 ck.iconbitmap('Resources/ico_logo.ico') # Set icon
 ck.geometry(str(GLOBAL_W) + "x" + str(GLOBAL_H)) # Set original size
 ck.configure(bg = COL_BG) # Background color
@@ -433,7 +434,8 @@ def sv_handle_client_send_data_admin(conn, cl_name):
     # check for the type of submission
     sm_type = sv_get_msg(conn) # SM_EC: city; SM_ED: date
     # get the data according to the type
-    if (sm_type == SM_EC):
+    if (sm_type == SM_EC): # city
+
         sm_cityId = sv_get_msg(conn) # city id
         sm_cityName = sv_get_msg(conn) # city name
         tm_print(f"{cl_name} Submitted City ID: {sm_cityId}")
@@ -445,6 +447,7 @@ def sv_handle_client_send_data_admin(conn, cl_name):
                             WHERE cityId = '{sm_cityId}'
                         """)
         city_count = db_cur.fetchone()[0] # get the count
+
         if (city_count != 0): # if the city exists, update it
             tm_print(f"{cl_name} City already exists. It will be updated instead.")
             db_cur.execute(f"UPDATE TB_CITY SET cityName = '{sm_cityName}' WHERE cityId = '{sm_cityId}'")
@@ -455,6 +458,46 @@ def sv_handle_client_send_data_admin(conn, cl_name):
             sv_send_msg(SM_EC_2, conn)
             tm_print(f"{cl_name} City added.")
 
+    else: # date
+
+        sm_cityId = sv_get_msg(conn) # city id
+        sm_dateDate = sv_get_msg(conn) # date
+        sm_dateTemp = sv_get_msg(conn) # temperature
+        sm_dateStat = sv_get_msg(conn) # status
+        tm_print(f"{cl_name} Submitted City ID: {sm_cityId}")
+        tm_print(f"{cl_name} Submitted Date: {sm_dateDate}")
+        tm_print(f"{cl_name} Temperature: {sm_dateTemp} | Status: {sm_dateStat}")
+
+        # check for the city's existence
+        db_cur.execute(f""" SELECT COUNT(*)
+                            FROM TB_CITY
+                            WHERE cityId = '{sm_cityId}'
+                        """)
+        city_count = db_cur.fetchone()[0] # get the count of the city
+        if (city_count == 0):
+            tm_print(f"{cl_name} City doesn't exist. Notification is sent to admin.")
+            sv_send_msg(SM_EC_0, conn)
+            return
+
+        # check for the date's existence
+        db_cur.execute(f""" SELECT COUNT(*)
+                            FROM TB_DATE
+                            WHERE cityId = '{sm_cityId}' AND dateDate = '{sm_dateDate}'
+                        """)
+        date_count = db_cur.fetchone()[0] # get the count
+
+        if (date_count != 0): # if the city exists, update it
+            tm_print(f"{cl_name} Date already exists. It will be updated instead.")
+            db_cur.execute(f""" UPDATE TB_DATE SET dateTemp = '{sm_dateTemp}', dateStat = '{sm_dateStat}'
+                                WHERE cityId = '{sm_cityId}' AND dateDate = '{sm_dateDate}'
+                            """)
+            sv_send_msg(SM_ED_1, conn)
+            tm_print(f"{cl_name} Date updated.")
+        else: # if it doesn't, add it to the database
+            db_cur.execute(f"INSERT INTO TB_DATE VALUES ('{sm_cityId}', '{sm_dateDate}', '{sm_dateTemp}', '{sm_dateStat}')")
+            sv_send_msg(SM_ED_2, conn)
+            tm_print(f"{cl_name} Date added.")
+        
 def sv_send_msg(a_msg, conn):
     msg = a_msg.encode(FORMAT) # encode the message
     msg_len = len(msg) # get length of the message

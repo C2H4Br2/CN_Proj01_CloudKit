@@ -68,8 +68,9 @@ username = ""; password = ""
 still_connect = False
 
 # Send & receiving
-submit = False
+submit = False; submit_type = 0 # 0: city; 1: date
 sm_cityID = ""; sm_cityName = ""
+sm_dateDate = ""; sm_dateTemp = ""; sm_dateStat = ""
 lg_error =  [
                 "Server is not active.",
                 "Cannot connect to server.",
@@ -92,7 +93,7 @@ def thread_mbox(title, body):
     #thr_mbox.start()
     mbox.showinfo(title, body)
 
-# Convert string date format
+# Convert string date format 
 def date_convert(date):
     return f"{date[8:10:1]}/{date[5:7:1]}/{date[0:4:1]}"
 
@@ -104,7 +105,7 @@ class Ck(Tk):
         # constructor method for Tk
         Tk.__init__(self, *args, **kwargs)
         
-        self.title('Cloud Kit Weather Forecast') # set title
+        self.title('Cloud Kit Server Manager') # set title
         self.iconbitmap('Resources/ico_logo.ico') # set icon
         self.geometry(f"{str(GLOBAL_W)}x{str(GLOBAL_H)}+{WIN_OFFSETX}+{WIN_OFFSETY}") # set original size
         self.configure(bg = COL_BG) # background color
@@ -216,18 +217,41 @@ class Ck(Tk):
 
             # check if admin add or edit something
             if (submit):
-                self.cl_send(SUBMIT)
-                self.cl_send(SM_EC)
-                self.cl_send(sm_cityId)
-                self.cl_send(sm_cityName)
-                submit = False
-
-                # get the notification
                 noti = ""
-                if (self.cl_get() == SM_EC_1):
-                    noti = "City already exists and has been updated."
+                
+                # submit city for addition/edit
+                if (submit_type == 0):
+                    self.cl_send(SUBMIT)
+                    self.cl_send(SM_EC)
+                    self.cl_send(sm_cityId)
+                    self.cl_send(sm_cityName)
+                    submit = False
+
+                    # get the notification
+                    noti_get = self.cl_get()
+                    if (noti_get == SM_EC_1):
+                        noti = "City already exists and has been updated."
+                    else:
+                        noti = "City has been added to the database."
+                # submit date for addition/edit
                 else:
-                    noti = "City has been added to the database."
+                    self.cl_send(SUBMIT)
+                    self.cl_send(SM_ED)
+                    self.cl_send(sm_cityId)
+                    self.cl_send(sm_dateDate)
+                    self.cl_send(sm_dateTemp)
+                    self.cl_send(sm_dateStat)
+                    submit = False
+                    
+                    # get the notification
+                    noti_get = self.cl_get()
+                    if (noti_get == SM_ED_1):
+                        noti = "Date already exists and has been updated."
+                    elif (noti_get == SM_ED_2):
+                        noti = "Date has been added to the database."
+                    else:
+                        noti = "City doesn't exist."
+
                 thread_mbox("NOTIFICATION", noti)
 
             # check for disconnection
@@ -445,7 +469,7 @@ class ck_main_editCity(Frame):
 
     # submit city
     def rm_main_editCity_submit(self):
-        global submit, sm_cityId, sm_cityName # enable edit for these variables
+        global submit, submit_type, sm_cityId, sm_cityName # enable edit for these variables
         # get info from input fields
         sm_cityId = self.en_id.get()
         sm_cityName = self.en_name.get()
@@ -459,6 +483,7 @@ class ck_main_editCity(Frame):
             return
         
         # submit
+        submit_type = 0
         submit = True
 
 # == GUI: MAIN FRAME - EDIT DATE =============================================================
@@ -524,6 +549,30 @@ class ck_main_editDate(Frame):
             # buttons
         self.btn_submit.place(x = CEN_X, y = entry_y + entry_h * 7, anchor = "n")
 
+    # submit date
+    def rm_main_editDate_submit(self):
+        global submit, submit_type, sm_cityId, sm_dateDate, sm_dateTemp, sm_dateStat # enable edit for these variables
+        # get info from input fields
+        sm_cityId = self.en_cityId.get()
+        sm_dateDate = self.en_date.get()
+        sm_dateTemp = self.en_temp.get()
+        sm_dateStat = self.en_status.get()
+
+        # check for invalid input
+        if (not sm_cityId or not sm_dateDate or not sm_dateTemp or not sm_dateStat): # blank input
+            thread_mbox("WARNING!", "Blank input is not allowed!")
+            return 
+        elif (len(sm_cityId) != 3): # invalid city ID
+            thread_mbox("WARNING!", "City ID's length must be 3!")
+            return
+        elif (sm_dateStat not in ['Sunny', 'Rainy', 'Cloudy', 'Foggy']): # not in said status
+            thread_mbox("WARNING!", "Invalid status.")
+            return
+        
+        # submit
+        submit_type = 1
+        submit = True
+
 # == GUI: WELCOME WINDOW =====================================================================
 
 class ck_welcome(Tk):
@@ -536,7 +585,7 @@ class ck_welcome(Tk):
         self.overrideredirect(1)
 
         # prepare video
-        self.vid_src = SRC + "ck_welcome.mp4" # video's path
+        self.vid_src = "Resources/ck_welcome.mp4" # video's path
         self.lb_vid = Label(self)
         self.lb_vid.pack() # set video's label
         self.vid = tkvideo(self.vid_src, self.lb_vid, loop = 0, size = (800, 600))
@@ -549,8 +598,8 @@ class ck_welcome(Tk):
 
 # == MAIN PROGRAM ============================================================================
 
-#welcome = ck_welcome()
-#welcome.mainloop()
+welcome = ck_welcome()
+welcome.mainloop()
 
 app = Ck()
 app.mainloop()
