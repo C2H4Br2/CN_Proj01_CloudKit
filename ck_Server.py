@@ -186,9 +186,6 @@ img_btn_start = PhotoImage(file = SRC + "spr_btn_server_start.png") # start butt
 img_btn_stop = PhotoImage(file = SRC + "spr_btn_server_stop.png") # shut down button
 
 # widgets
-    # credits
-lb_credit = Label(ck, text = "Developed by Tran Thanh Tung - 19127311 and Huynh Thu Thao - 19127551",
-    font = FNT_SMOL, bg = COL_BG, fg = COL_GRAY)
     # image labels
 lb_logo = Label(ck, image = img_logo, bg = COL_BG) # logo
 lb_terminal = Label(ck, image = img_terminal, bg = COL_BG) # dummy terminal
@@ -206,8 +203,6 @@ tb_terminal.configure(state = "disabled") # disable terminal
 pad_x = 36
     # logo
 lb_logo.place(x = pad_x, y = 24, anchor = "nw")
-    # credits
-lb_credit.place(x = CEN_X, y = GLOBAL_H  - 12, anchor = "s")
     # terminal
 lb_terminal.place(x = CEN_X, y = CEN_Y + 36, anchor = "center") # dummy terminal
 tb_terminal.place(x = CEN_X, y = CEN_Y + 36, anchor = "center") # terminal
@@ -291,8 +286,11 @@ def sv_handle_login(conn, addr): # client's connection and address
                         FROM TB_USER
                         WHERE userName = '{cl_name}'
                         GROUP BY userName""")
-    cur_count_arr = db_cur.fetchone() # get the result string
-    cur_count = cur_count_arr[0] # get the count from the string
+    cur_count_arr = db_cur.fetchone() # get the result string  
+    if (cur_count_arr == None):
+        cur_count = 0
+    else:
+        cur_count = cur_count_arr[0] # get the count from the string
     name_exist = (cur_count > 0)
 
     if (cl_lgtype == 1): # 1: register
@@ -318,9 +316,9 @@ def sv_handle_login(conn, addr): # client's connection and address
         else:
             error_type = 4 # "Username doesn't exist."
 
-        # if all of the above fail
-        sv_send_msg(MSG_LG_FALSE, conn)
-        sv_send_msg(str(error_type), conn)
+    # if all of the above fail
+    sv_send_msg(MSG_LG_FALSE, conn)
+    sv_send_msg(str(error_type), conn)
 
 # handle a single client
 def sv_handle_client(conn, addr, cl_name, cl_usertype): # client's connection and address
