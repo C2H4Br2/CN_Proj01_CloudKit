@@ -11,6 +11,8 @@ BEFORE running the code, make sure to do the followings:
     -> In command prompt, type in: "pip install [library name]".
     NOTE: Some libraries are pre-installed, so reinstallation is unneccessary.
 3. Change the SQL Server (DB_SERVER) in ck_Server.py to yours.
+4. Install 'Quicksand' font by opening the Font folder in Control Panel.
+    -> Drag and drop the 'Quicksand' font files into the folder.
 
 -- How to run --
 Open command prompt and type in "python ck_[program name].py".
